@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b0b12" />
+<title>Hoshiva — Modern Wallpaper Search</title>
+<meta name="description" content="Hoshiva: mesin pencari wallpaper modern. Cari, atur ukuran, upscale, dan unduh wallpaper HD." />
+<link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="apple-touch-icon" href="/assets/logo-512.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Zen+Dots&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/css/style.css" />
+<script>
+  try {
+    var t = JSON.parse(localStorage.getItem('hoshiva:theme') || 'null');
+    document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark';
+  } catch (_) {
+    document.documentElement.dataset.theme = 'dark';
+  }
+</script>
+</head>
+<body>
+
+<!-- aura latar -->
+<div class="aura" aria-hidden="true">
+  <span class="aura__blob aura__blob--1"></span>
+  <span class="aura__blob aura__blob--2"></span>
+  <span class="aura__blob aura__blob--3"></span>
+  <span class="aura__grid"></span>
+</div>
+
+<!-- ============================ HEADER ============================ -->
+<header class="topbar" id="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="/" aria-label="Hoshiva beranda">
+      <!-- Dua logo, dipilih lewat html[data-theme]: yang transparan untuk tema
+           terang, yang putih untuk tema gelap (lihat scripts/logo-theme.js). -->
+      <img class="brand__logo brand__logo--light" src="/assets/logo.png" alt="Logo Hoshiva" width="1232" height="352" />
+      <img class="brand__logo brand__logo--dark" src="/assets/logo-dark.png" alt="" aria-hidden="true" width="1713" height="488" />
+    </a>
+
+    <form class="search" id="searchForm" role="search" autocomplete="off">
+      <div class="search__box">
+        <svg class="search__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 105.06 13.06l4.19 4.19 1.5-1.5-4.19-4.19A7.5 7.5 0 0010.5 3zm0 2a5.5 5.5 0 110 11 5.5 5.5 0 010-11z"/></svg>
+        <input
+          id="q"
+          name="q"
+          type="search"
+          class="search__input"
+          placeholder="Cari wallpaper anime…  mis. sakura, cyberpunk, waifu"
+          aria-label="Cari wallpaper"
+        />
+        <button type="button" class="search__clear" id="clearQ" aria-label="Bersihkan pencarian" hidden>&times;</button>
+        <button type="submit" class="search__go" aria-label="Cari">
+          <span>Cari</span>
+          <kbd>/</kbd>
+        </button>
+      </div>
+
+      <div class="chips" id="quickChips" role="list" aria-label="Pencarian cepat"></div>
+    </form>
+
+    <div class="topbar__actions">
+      <button class="iconbtn" id="btnNew" title="Wallpaper baru masuk (Ctrl+R)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10.59l3.7 3.7-1.41 1.42L13 15.41V22h-2v-6.59l-3.3 3.3-1.4-1.42 3.7-3.7-3.7-3.7L7.7 5.88l3.3 3.3V2h2v7.17l3.3-3.3 1.41 1.42z"/></svg>
+        <span class="iconbtn__label">Baru</span>
+        <i class="dot" id="newDot" hidden></i>
+      </button>
+      <button class="iconbtn" id="btnFilters" title="Buka filter" aria-controls="panel" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v2H3V5zm3 6h12v2H6v-2zm4 6h4v2h-4v-2z"/></svg>
+        <span class="iconbtn__label">Filter</span>
+        <i class="dot" id="filterDot" hidden></i>
+      </button>
+      <button class="iconbtn iconbtn--ghost" id="btnTheme" title="Ganti tema">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18a6 6 0 110-12 6 6 0 010 12zm0-2a4 4 0 100-8 4 4 0 000 8zM11 1h2v3h-2V1zm0 19h2v3h-2v-3zM1 11h3v2H1v-2zm19 0h3v2h-3v-2zM4.2 2.8l2.1 2.1-1.4 1.4-2.1-2.1L4.2 2.8zm15.6 15.6l1.4-1.4-2.1-2.1-1.4 1.4 2.1 2.1zM2.8 19.8l2.1-2.1 1.4 1.4-2.1 2.1-1.4-1.4zm16.4 0l-1.4-1.4 2.1-2.1 1.4 1.4-2.1 2.1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="topbar__progress" id="progress"></div>
+</header>
+
+<!-- ============================ LAYOUT ============================ -->
+<div class="scrim" id="scrim" hidden></div>
+
+<div class="layout">
+
+  <!-- ------------------------ SIDEBAR (drawer) ------------------------ -->
+  <!-- disembunyikan secara bawaan; dibuka lewat tombol "Atur" lalu slide keluar
+       supaya tidak memakan setengah lebar layar. -->
+  <aside class="panel" id="panel" aria-label="Filter" aria-hidden="true">
+    <div class="panel__head">
+      <h2>Filter</h2>
+      <button class="linkbtn" id="resetFilters">Reset</button>
+      <button class="panel__close iconbtn iconbtn--ghost" id="closePanel" aria-label="Tutup filter">&times;</button>
+    </div>
+
+    <div class="panel__body">
+
+      <!-- sumber: hanya yang benar-benar bisa dipanggil -->
+      <section class="fgroup">
+        <h3 class="fgroup__title">Sumber</h3>
+        <div class="radios" id="sourceRow"></div>
+        <p class="hint" id="srcHint" hidden>Tidak ada sumber yang bisa dihubungi. Semua pencarian memakai mode Otomatis.</p>
+        <div class="srcstatus" id="srcStatus"></div>
+      </section>
+
+      <!-- rasio -->
+      <section class="fgroup">
+        <h3 class="fgroup__title">Rasio gambar</h3>
+        <select id="ratioSel"></select>
+        <p class="hint">Wallpaper dalam rasio 32:9 atau 9:16 biasanya perlu di-crop manual setelah dibuka.</p>
+      </section>
+
+      <!-- kategori otomatis (semua ditampilkan) -->
+      <section class="fgroup">
+        <h3 class="fgroup__title">
+          <span>Kategori</span>
+          <em class="badge badge--live" id="catBadge">0</em>
+        </h3>
+        <p class="hint">Kategori dibuat &amp; diperbarui otomatis saat wallpaper baru masuk dari API.</p>
+        <div class="chips chips--cat" id="catRow"></div>
+      </section>
+
+      <!-- trending tags -->
+      <section class="fgroup">
+        <h3 class="fgroup__title">Tag populer</h3>
+        <div class="chips chips--sm" id="trendRow"></div>
+      </section>
+
+      <!-- sort -->
+      <section class="fgroup">
+        <h3 class="fgroup__title">Urutkan</h3>
+        <div class="segmented" id="sortRow"></div>
+      </section>
+    </div>
+
+    <div class="panel__foot">
+      <button class="btn btn--primary btn--block" id="applyFilters">Lihat hasil</button>
+    </div>
+  </aside>
+
+  <!-- ------------------------ MAIN ------------------------ -->
+  <main class="main" id="main">
+    <div class="main__head">
+      <div class="statline" id="statline"></div>
+      <div class="viewtoggle">
+        <button class="iconbtn iconbtn--ghost is-active" data-view="grid" title="Grid">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z"/></svg>
+        </button>
+        <button class="iconbtn iconbtn--ghost" data-view="list" title="Daftar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2v2H4V5zm4 0h12v2H8V5zM4 11h2v2H4v-2zm4 0h12v2H8v-2zm-4 6h2v2H4v-2zm4 0h12v2H8v-2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid" data-view="grid" aria-live="polite"></div>
+
+    <div class="empty" id="empty" hidden>
+      <div class="empty__art">🌸</div>
+      <h3 id="emptyTitle">Belum ada wallpaper</h3>
+      <p id="emptyText">Coba ubah kata kunci atau longgarkan filter.</p>
+      <button class="btn btn--primary" id="emptyRetry">Muat ulang</button>
+    </div>
+
+    <div class="loadmore">
+      <button class="btn" id="loadMore">Muat lebih banyak</button>
+      <div class="spinner" id="spinner" hidden></div>
+    </div>
+
+    <footer class="foot">
+      <img src="/assets/logo-512.png" alt="" class="foot__logo foot__logo--light" width="512" height="146" />
+      <img src="/assets/logo-dark-512.png" alt="" aria-hidden="true" class="foot__logo foot__logo--dark" width="512" height="146" />
+      <p><strong>Hoshiva</strong> — Mesin Pencari Wallpaper.<br />
+      Kami menghormati hak cipta kreator aslinya.</p>
+    </footer>
+  </main>
+</div>
+
+<!-- ============================ LIGHTBOX ============================ -->
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Detail wallpaper">
+  <div class="lb__backdrop" data-close></div>
+
+  <div class="lb__shell">
+    <!-- sisi gambar -->
+    <div class="lb__stage" id="lbStage">
+      <img class="lb__img" id="lbImg" alt="" />
+      <div class="lb__spin" id="lbSpin" hidden><span></span><span></span><span></span></div>
+
+      <button class="navbtn navbtn--prev" id="lbPrev" aria-label="Sebelumnya">‹</button>
+      <button class="navbtn navbtn--next" id="lbNext" aria-label="Berikutnya">›</button>
+      <button class="lb__closebtn" data-close aria-label="Tutup">×</button>
+
+      <div class="lb__toolbar">
+        <div class="lb__dims" id="lbDims"></div>
+        <div class="lb__tools">
+          <button class="tool" id="tbFit" title="Isi layar (F)">⤢</button>
+          <button class="tool" id="tbActual" title="Ukuran asli (1)">1:1</button>
+          <button class="tool" id="tbCrop" title="Crop manual (C)">✂</button>
+          <button class="tool" id="tbZoomOut" title="Perkecil (-)">−</button>
+          <span class="tool__val" id="tbZoom">100%</span>
+          <button class="tool" id="tbZoomIn" title="Perbesar (+)">+</button>
+          <button class="tool" id="tbWb" title="Hitung ukuran wallpaper">📐</button>
+        </div>
+      </div>
+
+      <!-- cropper (hanya saat mode crop aktif) -->
+      <div class="cropper" id="cropper" hidden>
+        <div class="cropper__frame" id="cropFrame">
+          <div class="cropper__rule cropper__rule--v"></div>
+          <div class="cropper__rule cropper__rule--h"></div>
+          <i class="cropper__grip cropper__grip--nw" data-grip="nw"></i>
+          <i class="cropper__grip cropper__grip--ne" data-grip="ne"></i>
+          <i class="cropper__grip cropper__grip--sw" data-grip="sw"></i>
+          <i class="cropper__grip cropper__grip--se" data-grip="se"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- sisi informasi -->
+    <aside class="lb__info" id="lbInfo">
+      <header class="lb__infohead">
+        <p class="lb__src" id="lbSrc"></p>
+        <h2 class="lb__title" id="lbTitle"></h2>
+        <div class="lb__meta" id="lbMeta"></div>
+      </header>
+
+      <div class="lb__actions">
+        <a class="btn btn--primary" id="dlBtn" download>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.6l3.3-3.3 1.4 1.4L11 17.4 5.3 11.7l1.4-1.4L10 13.6V3h2zM4 19h16v2H4v-2z"/></svg>
+          <span id="dlLabel">Unduh</span>
+        </a>
+        <button class="btn" id="copyBtn" title="Salin link gambar">Salin link</button>
+        <button class="btn" id="favBtn" title="Favorit (F)">☆ Favorit</button>
+        <button class="btn btn--icon" id="origBtn" title="Buka file asli" target="_blank" rel="noopener">↗</button>
+      </div>
+
+      <div class="lb__section">
+        <h4>Kualitas &amp; ukuran</h4>
+        <div class="specgrid" id="specGrid"></div>
+      </div>
+
+      <div class="lb__section">
+        <h4>Ukuran wallpaper <em class="badge" id="sizeBadge">—</em></h4>
+        <div class="sizebox">
+          <div class="segmented" id="presetRow" role="radiogroup" aria-label="Preset ukuran"></div>
+          <div class="sizebox__nums">
+            <label class="field">
+              <span>Lebar (px)</span>
+              <input type="number" id="wNum" min="320" max="7680" step="10" inputmode="numeric" />
+            </label>
+            <label class="field">
+              <span>Tinggi (px)</span>
+              <input type="number" id="hNum" min="320" max="4320" step="10" inputmode="numeric" />
+            </label>
+          </div>
+          <div class="sizebox__quick">
+            <button class="pill" id="btnScreen">Layar saya</button>
+            <button class="pill" id="btnSwap">Tukar W/H</button>
+            <button class="pill" id="btnOriginal">Asli</button>
+          </div>
+          <label class="field">
+            <span>Cara pas ke ukuran</span>
+            <select id="fitMode">
+              <option value="contain">Contain — penuh, ada tepi</option>
+              <option value="cover">Cover — penuh, terpotong</option>
+              <option value="width">Kunci lebar</option>
+              <option value="height">Kunci tinggi</option>
+              <option value="raw">Asli — tanpa ubah ukuran</option>
+            </select>
+          </label>
+          <p class="hint" id="screenHint"></p>
+        </div>
+      </div>
+
+      <div class="lb__section">
+        <h4>Crop manual</h4>
+        <div class="cropbox">
+          <p class="hint" id="cropHint">
+            Tekan <b>✂ Crop</b> (atau tombol di bawah) lalu seret kotak di gambar
+            untuk memotong bagian yang diinginkan. Hasil minimal 15% per sisi —
+            crop 100×100 dari wallpaper besar tidak berguna sebagai wallpaper.
+          </p>
+          <div class="cropbox__foot">
+            <span class="cropbox__size" id="cropSize">Tanpa crop</span>
+            <button class="btn btn--sm" id="cropClear" hidden>Hapus</button>
+            <button class="btn btn--sm" id="cropCancel" hidden>Batal</button>
+            <button class="btn btn--sm btn--primary" id="cropApply" hidden>Terapkan</button>
+          </div>
+          <button class="btn btn--block" id="cropStart">Mulai crop</button>
+        </div>
+      </div>
+
+      <div class="lb__section">
+        <h4>Upscale</h4>
+        <div class="upscale-box">
+          <p class="hint" id="upscaleNote"></p>
+          <button class="btn btn--primary btn--block" id="runUpscale">Upscale otomatis</button>
+        </div>
+      </div>
+
+      <div class="lb__section lb__section--tags">
+        <h4>Tag <em class="badge" id="tagCount">0</em></h4>
+        <div class="tagcloud" id="tagCloud"></div>
+      </div>
+
+      <div class="lb__section">
+        <h4>Wallpaper serupa</h4>
+        <div class="similar" id="similar"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="/js/app.js" type="module"></script>
+</body>
+</html>

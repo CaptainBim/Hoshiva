@@ -1,0 +1,30 @@
+{
+  "name": "hoshiva",
+  "version": "1.0.0",
+  "description": "Hoshiva - modern wallpaper search engine",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "logo": "node scripts/make-logo.js",
+    "logo:dark": "node scripts/logo-theme.js",
+    "test": "node scripts/test-unit.js",
+    "test:ssrf": "node scripts/test-ssrf.js",
+    "test:taxonomy": "node scripts/test-taxonomy.js",
+      "test:budget": "node scripts/test-budget.js",
+    "test:image": "node scripts/test-image.js",
+    "test:cache": "node scripts/test-cache.js",
+    "test:ratio": "node scripts/test-ratio.js",
+    "test:api": "node scripts/test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "sharp": "^0.33.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "private": true
+}

@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# runtime state (cache TTL + auto taxonomy; dibuat ulang otomatis)
+data/cache/
+data/taxonomy.json
+
+# env
+.env
+.env.local
+
+# logs & OS junk
+*.log
+*.err
+server.log
+server.err
+npm-debug.log*
+Thumbs.db
+.DS_Store
+
+# editor
+.vscode/
+.idea/
