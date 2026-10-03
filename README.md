@@ -1,18 +1,17 @@
 # Hoshiva
 
-Mesin pencari wallpaper anime modern. Backend Node/Express memproxyl semua
-permintaan ke sumber gambar booru (DAPI Gelbooru + Wallhaven), menyediakannya
-dengan ukuran yang tepat untuk layarmu, dan melakukan upscale opsional dengan
-gaya waifu2x.
+Mesin pencari wallpaper modern. Backend Node/Express memproxyl semua
+permintaan ke sumber gambar (Wallhaven + Safebooru), menyediakannya dengan
+ukuran yang tepat untuk layarmu, dan mendukung upscale dengan gaya waifu2x.
 
-![Hoshiva](public/assets/logo.png)
+![Hoshiva](logo-terang.png)
 
 ---
 
 ## Fitur
 
-- **Pencarian multi-sumber** — Wallhaven (wallpaper-oriented) + Safebooru, dan
-  booru lain yang kompatibel DAPI. Hasil digabung round-robin supaya satu
+- **Pencarian multi-sumber** — Wallhaven (wallpaper-oriented) + Safebooru, dengan
+  dukungan untuk sumber booru yang kompatibel DAPI. Hasil digabung round-robin supaya satu
   sumber yang down tidak mengosongikan halaman. Sumber yang tidak terjangkau
   disembunyikan dari pilihan; kalau tak satu pun hidup, hanya **Otomatis** yang
   tersisa.
@@ -35,15 +34,13 @@ gaya waifu2x.
   per wallpaper di `localStorage` dan ikut terbawa ke unduhan.
 - **Upscale satu tombol** — tidak ada lagi pilihan mode. Tombol **Upscale
   otomatis** menaikkan gambar hanya kalau target lebih besar dari sumber
-  (dicek setelah crop), memakai gaya waifu2x. Bila binary `waifu2x-ncnn`
+  (dicek setelah crop), memakai gaya waifu2x. Bila binary `waifu2x-ncnn-vulkan`
   terpasang, ia dipakai otomatis.
 - **Kategori otomatis** — setiap wallpaper yang masuk "diumati"; entitas
   (nama karakter/series) yang sering muncul dipromosikan menjadi kategori baru.
   Tag generik (rambut, warna pakaian, ekspresi, waktu/suasana seperti `day`
   atau `dawn`) tidak pernah dipromosikan. Disimpan permanen ke
   `data/taxonomy.json`.
-  Jumlahnya dijaga empat rem supaya tidak membengkak — lihat
-  [Anggaran kategori](#anggaran-kategori).
 - **Filter orientasi yang benar** — Landscape / Portrait / Square / Tall /
   Ultrawide. Sumber tidak selalu dipercaya: Wallhaven hanya menerima daftar
   `ratios` miliknya sendiri dan booru mengandalkan tag yang sering kosong, jadi
@@ -80,8 +77,6 @@ Windows/macOS/Linux sehingga tidak perlu compiler.
 | `npm run test:image` | hanya test pipeline resize/upscale |
 | `npm run test:cache` | hanya test cache memori + disk |
 | `npm run test:ratio` | hanya test filter orientasi/rasio |
-| `npm run logo` | buat ulang logo terang dari sumber (lihat bagian Logo) |
-| `npm run logo:dark` | buat ulang logo tema gelap dari sumber |
 
 ### Variabel lingkungan
 
@@ -91,28 +86,28 @@ Windows/macOS/Linux sehingga tidak perlu compiler.
 | `HOST` | `127.0.0.1` | bind address (set `0.0.0.0` untuk diakses dari perangkat lain) |
 | `FETCH_TIMEOUT` | `15000` | timeout fetch ke sumber, dalam ms |
 | `MAX_OUTPUT_PX` | `12000` | batas sisi terpanjang hasil resize/upscale |
-| `WAIFU2X_PATH` | — | path absolut binary `waifu2x-ncnn` |
+| `WAIFU2X_PATH` | — | path absolut executable `waifu2x-ncnn-vulkan` |
 
 ---
 
-## waifu2x asli (opsional)
+## waifu2x
 
-Tanpa binary apa pun, Hoshiva tetap bisa upscale memakai `sharp`
-(median denoise → Lanczos3 → unsharp), yang hasilnya cukup bagus untuk garis
-anime. Untuk hasil waifu2x yang asli:
+Tanpa binary apa pun, Hoshiva tetap bisa upscale memakai `sharp` (median denoise →
+Lanczos3 → unsharp), yang hasilnya cukup bagus untuk garis anime. Untuk memakai
+engine waifu2x berbasis NCNN + Vulkan, gunakan **waifu2x-ncnn-vulkan** dari
+[`nihui/waifu2x-ncnn-vulkan`](https://github.com/nihui/waifu2x-ncnn-vulkan/releases).
 
-1. Unduh **waifu2x-ncnn** (rilis Windows/Linux di
-   [`nagadomi6/waifu2x-ncnn`](https://github.com/nagadomi6/waifu2x-ncnn/releases)).
-2. Ekstrak, lalu taruh binary-nya di `D:\web\hoshiva\tools\waifu2x-ncnn.exe`
-   (atau set `WAIFU2X_PATH` ke path lengkap).
+1. Unduh rilis yang sesuai dengan Windows/Linux/macOS dan GPU yang digunakan.
+2. Ekstrak paketnya, lalu arahkan `WAIFU2X_PATH` ke executable
+   `waifu2x-ncnn-vulkan` (di Windows biasanya `waifu2x-ncnn-vulkan.exe`).
 3. Restart server.
 
-Hoshiva mendeteksi binary itu saat boot dan otomatis memakainya. Header
-`x-hoshiva-engine` pada `/api/img` memberi tahu yang benar-benar dipakai:
-`waifu2x-binary` atau `sharp-waifu2x`. Kalau binary gagal, sistem otomatis
+Rilis tersebut menyediakan executable dan model yang diperlukan dalam paket
+portable, tanpa perlu memasang CUDA atau runtime Caffe terpisah. Hoshiva
+mendeteksi binary itu saat boot dan otomatis memakainya. Header `x-hoshiva-engine`
+pada `/api/img` memberi tahu engine yang benar-benar dipakai:
+`waifu2x-binary` atau `sharp-waifu2x`. Bila binary gagal, sistem otomatis
 kembali ke `sharp` dan hanya menulis satu peringatan ke log.
-
----
 
 ## Sumber gambar
 
@@ -120,14 +115,10 @@ kembali ke `sharp` dan hanya menulis satu peringatan ke log.
 | --- | --- | --- |
 | Wallhaven | Wallhaven API | ✅ hidup |
 | Safebooru | DAPI (booru) | ✅ hidup |
-| Gelbooru | DAPI (booru) | ❌ tidak terjangkau |
-| Konachan / Rule34 / Xbooru | DAPI (booru) | ❌ tidak terjangkau |
 
 Hoshiva dirancang multi-sources: sumber yang gagal akan dilewati dan ditampilkan
 sebagai DOWN di panel status, sementara sumber yang hidup tetap melayani
-permintaan. Di jaringan tempat proyek ini dibuat, hanya Wallhaven dan Safebooru
-yang terjangkau — di jaringan lain (tanpa pemblokiran) Gelbooru & teman
-otomatis ikut menyumbang.
+permintaan.
 
 ### Menambah sumber baru
 
@@ -137,7 +128,7 @@ Buka `server/sources.js`, tambahkan entri ke `SOURCES`:
 {
   id: 'mybooru',
   label: 'My Booru',
-  kind: 'booru',          // 'booru' (DAPI Gelbooru) atau 'wallhaven'
+  kind: 'booru',          // booru yang kompatibel DAPI
   base: 'https://mybooru.example',
   purity: 'safe',         // 'safe' | 'sfw' | 'nsfw'
   wallpaper: true,
@@ -148,136 +139,6 @@ Adapter `kind: 'booru'` otomatis menangani pagination DAPI (parameter `pid`),
 tag berformat underscore, dan pemetaan `1girl`/`1boy` → `girl`/`boy`.
 
 ---
-
-## Logo
-
-Logo memakai dua varian yang dipilih lewat `html[data-theme]`. Keduanya di-build
-dengan langkah yang sama: flood-fill BFS dari 4 sudut (hanya latar yang terhubung
-ke tepi yang dibuang, jadi bagian dalam huruf tidak ikut berlubang) → un-
-premultiply tepi agar tidak bergaris gelap → trim ke bounding box isi.
-
-| Perintah | Sumber | Keluaran |
-| --- | --- | --- |
-| `npm run logo` | `Downloads/Logo Hoshiva.png` (latar putih) | `logo.png`, `logo-512.png`, `public/favicon.png` |
-| `npm run logo:dark` | `Downloads/logo terang.png` (2000×2000, latar `rgb(25,25,25)`) | `logo-dark.png`, `logo-dark-512.png` |
-
-Sumber file di-hardcode di bagian atas masing-masing script
-(`scripts/make-logo.js` dan `scripts/logo-theme.js`); edit `SRC` bila file Anda
-berada di tempat lain, atau lempar path sebagai argumen pertama:
-
-```bash
-node scripts/logo-theme.js "D:/gambar/logo baru.png"
-```
-
-Skrip `logo-theme.js` juga otomatis memangkas kanvas 2000×2000 menjadi wordmark
-lebar (hasilnya sekitar 3.5:1, sama rasio dengan logo terang) lewat `.trim()`,
-sehingga tinggi header tidak berubah saat tema diganti.
-
-> Logo gelap punya tekstur scanline di dalam hurufnya, jadi saat di-downscale ke
-> 42px tekstur itu berubah jadi moiré. Karena itu tinggi logo di header tetap
-> 42px — bukan dinaikkan untuk menghindari artefak.
-
-Logo dipakai di dua tempat, dan keduanya memakai pasangan varian yang sama:
-
-| Tempat | Tema terang | Tema gelap | Tinggi |
-| --- | --- | --- | --- |
-| header (`.brand__logo`) | `logo.png` | `logo-dark.png` | 42px |
-| footer (`.foot__logo`) | `logo-512.png` | `logo-dark-512.png` | 30px |
-
-Varian yang tidak aktif memakai `display: none`, bukan disembunyikan dengan
-opacity, supaya tidak ikut memengaruhi layout.
-
-`opacity` logo footer **wajib berbeda per tema**, dan itu bukan soal selera —
-kedua logo punya polaritas terbalik, jadi satu nilai tidak bisa melayani keduanya:
-
-| Tema | Background | Stroke logo | `opacity` | Kontras | WCAG AA |
-| --- | --- | --- | --- | --- | --- |
-| terang | `rgb(247,245,251)` | `L≈0.01` (hitam) | `.85` | 4.94:1 | lolos |
-| gelap | `rgb(8,8,15)` | `L=1.0` (putih) | `.4` | 8.59:1 | lolos |
-
-Nilai lama `.55` untuk keduanya menghasilkan kontras 2.07:1 di tema terang —
-gagal AA, logonya praktis tak terbaca. `grayscale()` hanya dipasang pada varian
-terang; varian gelap sudah putih sehingga filter itu hanya membuat putihnya keruh.
-
-> `favicon.png` dan `apple-touch-icon` tetap memakai varian terang. Keduanya tidak
-> bisa Berganti lewat CSS, dan tab browser jarang obeyed `data-theme`.
-
----
-
-## Anggaran kategori
-
-Kategori otomatis bertambah setiap wallpaper yang masuk, jadi tanpa rem ukurannya
-tumbuh linear. Pada data sekarang rasionya **0,0908 kategori per ingest**:
-
-| Total ingest | Kategori | Payload `/api/categories` |
-| --- | --- | --- |
-| 8.638 (sekarang) | 412 | 42 KB |
-| 50.000 | ~4.500 | ~470 KB |
-| 200.000 | ~18.000 | ~1,8 MB |
-
-Sebagian besar itu sampah: sebelum rem ini dipasang, **61% kategori punya
-≤12 hit** dan peringkat teratasnya adalah tag placeholder Danbooru —
-`Character Name` (958 hit), `Artist Name` (174), `Digital Media` (172). Semuanya
-menduduki posisi teratas padahal tidak pernah berguna difilter.
-
-Empat rem di `server/categories.js` (bagian `budgets`):
-
-| Rem | Nilai | Fungsi |
-| --- | --- | --- |
-| Ambang promote | `PROMO_MIN_ENTITY` 5, `PROMO_MIN_PLAIN` 22 |—was 3 dan 12. Tag biasa harus lebih sering muncul sebelum jadi kategori |
-| Plafon keras | `MAX_AUTO_CATS` 400 | Tidak bisa dilewati, dipangkas saat boot dan tiap 5 menit |
-| Meluruh | `STALE_AFTER` 30 hari, `STALE_MIN_HITS` 12 | Kategori lama yang tak pernah dipakai dibuang; harus bukti baru dari nol |
-| Penundaan | `CAP_CHECK_MS` 5 menit, `STALE_CHECK_MS` 6 jam | Cap & sweep tidak jalan tiap ingest, tapi terjadwal |
-
-Dua detail yang mudah salah dan sudah enshrined sebagai regression test:
-
-- **Cap adalah penyaring kualitas, bukan kuota.** Saat sudah di 400, kategori baru
-  hanya boleh masuk kalau lebih kuat daripada kategori auto yang terlemah.
-  Kalau tidak, ia masuk lalu langsung menyingkirkan yang lain di sweep berikutnya.
-- **Kategori yang dibuang karena basi atau bursting kehilangan counternya**
-  (di-nol-kan), sedangkan yang dibuang karena melanggar aturan tetap menyimpan
-  counter. Kalau counter basi dikembalikan utuh, tag itu langsung melewati ambang
-  lagi di ingest berikutnya dan masuk siklus promote-demote-promote.
-
-### Placeholder vs sufiks disambiguasi
-
-`DUMMY_TAGS` (placeholder) sengaja dicocokkan **persis**, bukan dengan regex:
-
-| Ditolak | Ditambah |
-| --- | --- |
-| `character name`, `artist name`, `series`, `digital media`, `book` | `devilman (character)`, `fate (series)`, `pokemon (creature)`, `eo (artist)` |
-
-Kata `character`, `series`, `artist` yang sama dalam bentuk `(...)` justru
-**penanda** tag sah — Danbooru memakainya untuk membedakan nama yang sama.
-Memblokirnya sebagai regex pernah membuang 8 entitas sah termasuk
-`Idolmaster Million Live! Theater Days` (869 hit).
-
----
-
-## Struktur
-
-```
-server/
-  index.js       Express app, semua route, penggabungan multi-sumber
-  config.js      preset ukuran, mode upscale, sort, env
-  sources.js     adapter Wallhaven + DAPI booru, scrape tag, pelonggaran query
-  image.js       proxy + crop + resize + upscale, guard SSRF, deteksi waifu2x
-  categories.js  taksonomi otomatis (promosi kategori dari entitas)
-  cache.js       cache 2-lapis (memori LRU + disk TTL) dengan serialisasi Buffer-safe
-public/
-  index.html     markup (drawer filter + lightbox ukuran/crop/upscale)
-  css/style.css  tema gelap/terang, drawer, cropper, responsif
-  js/app.js      state, pencarian, grid, drawer, lightbox, modul crop
-  js/api.js      klien API
-  js/ui.js       helper DOM, toast, ukuran layar, skor wallpaper
-scripts/
-  make-logo.js   pipeline logo tema terang
-  logo-theme.js  pipeline logo tema gelap
-  test*.js       test suite
-data/
-  taxonomy.json  state taksonomi (dibuat otomatis)
-  cache/         cache disk (dibuat otomatis, aman dihapus)
-```
 
 ## API
 
