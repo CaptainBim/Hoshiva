@@ -69,7 +69,11 @@ body {
   font-family: Outfit, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
+  /* `vh` di browser mobile mencakup area URL bar yang sedang tersembunyi, jadi
+     halaman jadi lebih tinggi dari viewport yang benar-benar terlihat dan
+     muncul scroll palsu. `dvh` mengikuti tinggi viewport saat ini. */
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
@@ -147,6 +151,9 @@ html[data-theme="light"] .aura__blob { opacity: .32; }
   -webkit-backdrop-filter: blur(22px) saturate(160%);
   background: color-mix(in srgb, var(--bg) 72%, transparent);
   border-bottom: 1px solid var(--stroke);
+  /* Notch dan status bar berada di dalam area sticky. Tanpa padding tambahan
+     ini, logo dan bar pencarian tertutup notch di iPhone. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .topbar__inner {
   max-width: 1720px;
@@ -315,7 +322,11 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 .panel {
   position: fixed; top: 0; right: 0;
   width: min(var(--panel-w), 92vw);
+  /* Panel setinggi layar penuh. `100vh` membuat panel lebih tinggi dari area
+     yang terlihat saat URL bar mobile masih muncul, sehingga tombol di bawah
+     tidak bisa dijangkau tanpa menggulir di dalam panel itu sendiri. */
   height: 100vh;
+  height: 100dvh;
   background: var(--bg-2);
   border-left: 1px solid var(--stroke);
   box-shadow: -22px 0 60px rgba(0, 0, 0, .5);
@@ -327,6 +338,11 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
   transition: transform .34s var(--ease), visibility .34s;
 }
 .panel.is-open { transform: translateX(0); visibility: visible; }
+/* Panel ini menempel di atas dan tidak ikut ter-scroll, jadi safe area tidak
+   bisa ditangani lewat padding elemen di dalamnya. */
+.panel__head {
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+}
 
 .panel__head {
   display: flex; align-items: center; gap: 10px;
@@ -679,7 +695,9 @@ select option { background: var(--bg-2); color: var(--text); }
 
 .foot {
   display: flex; align-items: center; gap: 14px;
-  padding: 26px 6px 10px;
+  /* `10px` saja membuat logo footer tertutup gesture bar / home indicator
+     di ponsel yang pakai navigasi gesture. */
+  padding: 26px 6px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--stroke);
   margin-top: 20px;
   font-size: 12px; color: var(--text-3);
@@ -742,6 +760,7 @@ html[data-theme="dark"] .foot__logo--dark { display: block; opacity: .7; filter:
   position: relative;
   width: min(1520px, 96vw);
   height: min(920px, 94vh);
+  height: min(920px, 94dvh);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 396px;
   gap: 0;
@@ -1040,12 +1059,60 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   .topbar__actions { grid-column: 1 / -1; justify-content: flex-end; }
   .brand__logo { height: 34px; }
   .layout { padding: 14px; }
-  .lb__shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; height: 96vh; }
-  .lb__info { border-left: 0; border-top: 1px solid var(--stroke); max-height: 46vh; padding: 16px; }
+  /* Info pindah ke bawah gambar. Batasnya min(46dvh, 320px): pada ponsel tegak
+     46dvh masih utuh, dan di layar pendek sisanya dikecilkan supaya area gambar
+     tidak habis. */
+  .lb__shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: 96vh;
+    height: 96dvh;
+  }
+  .lb__info {
+    border-left: 0; border-top: 1px solid var(--stroke);
+    max-height: min(46dvh, 320px);
+    padding: 16px;
+    /* Panel info menyentuh dasar layar, jadi harus menghormati gesture bar. */
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
   .lb__title { font-size: 18px; }
   .navbtn { opacity: 1; }
   .toasts { left: 14px; right: 14px; bottom: 14px; }
   .toast { max-width: none; }
+
+  /* Target sentuh. Apple menyarankan 44px, Android 48px; di desktop semua
+     target ini jauh lebih kecil karena memakai tetikus. Menambahnya hanya di
+     layar sentuh menjaga kepadatan desktop apa adanya. */
+  .search__clear { width: 44px; height: 44px; font-size: 24px; }
+  .iconbtn--ghost { padding: 13px; }
+  .lb__closebtn { width: 44px; height: 44px; }
+  .btn { min-height: 44px; }
+  .linkbtn { padding: 10px 2px; display: inline-block; }
+  /* Cegah zoom otomatis iOS: input dengan font di bawah 16px membuat Safari
+     memperbesar halaman saat difokus. */
+  .search__input, select, input[type="number"] { font-size: 16px; }
+}
+
+/* Ponsel Landscape: tinggi layar hanya sekitar 390px, jadi aturan lebar di
+   atas membuat lightbox menumpuk gambar di atas info dan keduanya tidak
+   muat. Di sini kembalikan tata letak samping-ke-samping. */
+@media (max-width: 900px) and (max-height: 520px) {
+  .lb__shell {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 38%);
+    grid-template-rows: minmax(0, 1fr);
+    height: 98vh;
+    height: 98dvh;
+  }
+  .lb__info {
+    border-left: 1px solid var(--stroke);
+    border-top: 0;
+    max-height: none;
+    padding: 14px;
+  }
+  .lb__title { font-size: 16px; }
+  .navbtn { width: 38px; height: 38px; font-size: 24px; }
+  .navbtn--prev { left: 8px; }
+  .navbtn--next { right: 8px; }
 }
 
 @media (max-width: 560px) {
@@ -1053,8 +1120,23 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   .grid[data-view="list"] .card { grid-template-columns: 116px minmax(0, 1fr); }
   .grid[data-view="list"] .card__thumb { width: 116px; }
   .search__go span { display: none; }
-  .search__go { padding: 10px 14px; }
+  .search__go { padding: 10px 14px; min-height: 40px; }
   .brand__tag { display: none; }
+  .foot { flex-wrap: wrap; gap: 10px; }
+  .foot__logo { height: 26px; }
+}
+
+/* Layar sangat sempit (iPhone SE 320px). Dengan minmax 150px, dua kolom
+   membutuhkan 310px sedangkan yang tersedia hanya 292px, jadi grid jatuh ke
+   satu kolom berisi kartu raksasa. Turunkan ambangnya supaya dua kolom muat. */
+@media (max-width: 400px) {
+  .layout { padding: 10px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+  .topbar__inner { padding: 10px 12px; }
+  .grid[data-view="list"] .card { grid-template-columns: 96px minmax(0, 1fr); }
+  .grid[data-view="list"] .card__thumb { width: 96px; min-height: 90px; }
+  .grid[data-view="list"] .card__body { padding: 10px 12px; }
+  .grid[data-view="list"] .card__foot { max-width: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
