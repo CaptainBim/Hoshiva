@@ -160,3 +160,28 @@ export function cacheSweep() {
   }
   return { removed, kept };
 }
+
+/**
+ * Hitungan cache tanpa efek samping: TIDAK membaca isi file dan TIDAK
+ * menghapus apa pun.
+ *
+ * Ini sengaja dipisah dari `cacheSweep` karena `/api/health` dipakai Railway
+ * sebagai healthcheck dan dipanggil berkali-kali. Sweep di dalam probe akan
+ * (a) menghapus file tiap kali Railway mem-ping, dan (b) memblokir event loop
+ * karena read + parse setiap entri. Hitungan disk cukup dari nama file, dan
+ * dimemoisasi sebentar supaya probe berdekatan tidak mengulang readdir.
+ */
+let statsMemo = { at: 0, disk: 0 };
+export function cacheStats() {
+  const now = Date.now();
+  if (now - statsMemo.at > 60_000) {
+    let disk = 0;
+    try {
+      for (const f of fs.readdirSync(CACHE_DIR)) if (f.endsWith('.json')) disk++;
+    } catch {
+      disk = 0;
+    }
+    statsMemo = { at: now, disk };
+  }
+  return { mem: mem.size, disk: statsMemo.disk };
+}

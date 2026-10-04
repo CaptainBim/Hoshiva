@@ -6,7 +6,32 @@ export const DATA_DIR = path.join(ROOT, 'data');
 /** Lokasi cache disk. `HOSHIVA_CACHE_DIR` dipakai test agar terisolasi. */
 export const CACHE_DIR = process.env.HOSHIVA_CACHE_DIR || path.join(DATA_DIR, 'cache');
 export const PORT = Number(process.env.PORT || 4173);
-export const HOST = process.env.HOST || '127.0.0.1';
+
+/**
+ * Platform-hosted (PaaS) menyuntik PORT tapi tidak menyetel HOST, dan proxy
+ * mereka menjangkau container lewat eth0. Kalau kita tetap bind ke 127.0.0.1,
+ * health check mereka tidak akan pernah lolos.
+ *
+ * Karena itu default ke 0.0.0.0 hanya kalau ada tanda platform. Lokal tetap
+ * loopback: /api/img memproxy URL arbitrer, jadi membukanya ke seluruh jaringan
+ * LAN tanpa sadar adalah gift untuk siapa pun yang memindai port tersebut.
+ * Host eksplisit lewat HOST selalu menang, jadi override manual tetap bisa.
+ */
+const PAAS = [
+  ['Railway', process.env.RAILWAY_ENVIRONMENT],
+  ['Render', process.env.RENDER],
+  ['Fly.io', process.env.FLY_APP_NAME],
+  ['Heroku', process.env.HEROKU_APP_NAME],
+].filter(([, v]) => v);
+
+export const HOST = process.env.HOST || (PAAS.length ? '0.0.0.0' : '127.0.0.1');
+
+/**
+ * Label platform untuk banner boot: nama yang terdeteksi, `HOST` kalau di-set
+ * manual, atau `lokal`. Berguna untuk memastikan bind address dari log saat
+ * menelusuri masalah deploy, tanpa perlu menebak.
+ */
+export const PLATFORM = process.env.HOST ? 'HOST' : PAAS.length ? PAAS[0][0] : 'lokal';
 
 export const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';

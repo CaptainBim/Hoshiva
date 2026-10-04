@@ -85,7 +85,7 @@ Windows/macOS/Linux sehingga tidak perlu compiler.
 | Variabel | Default | Guna |
 | --- | --- | --- |
 | `PORT` | `4173` | port server |
-| `HOST` | `127.0.0.1` | bind address (set `0.0.0.0` untuk diakses dari perangkat lain) |
+| `HOST` | loopback lokal, `0.0.0.0` di PaaS | bind address (lihat [Deploy](#deploy)) |
 | `FETCH_TIMEOUT` | `15000` | timeout fetch ke sumber, dalam ms |
 | `MAX_OUTPUT_PX` | `12000` | batas sisi terpanjang hasil resize/upscale |
 | `WAIFU2X_PATH` | — | path absolut executable `waifu2x-ncnn-vulkan` |
@@ -94,10 +94,75 @@ Windows/macOS/Linux sehingga tidak perlu compiler.
 | `HOSHIVA_LOGO_SRC` | — | sumber logo untuk `npm run logo*` |
 | `HOSHIVA_URL` | `http://127.0.0.1:4173` | target server untuk `npm run test:api` |
 
-Folder `data/` dibuat otomatis saat boot, jadi tidak perlu dibuat manual. Kalau
-dipakai di produksi, set `HOST=0.0.0.0` dan taruh di belakang reverse proxy —
-`/api/img` memproxy URL arbitrer, jadi guard SSRF adalah satu-satunya penghalang
-antar jaringan.
+Folder `data/` dibuat otomatis saat boot, jadi tidak perlu dibuat manual.
+
+---
+
+## Deploy
+
+Aplikasi ini stateless dari sisi build: tidak ada langkah kompilasi, `npm install`
+lalu `npm start` sudah cukup. `railway.json` sudah disertakan, jadi Railway bisa
+mendeteksi builder, start command, dan healthcheck tanpa konfigurasi manual.
+
+### Bind address
+
+Ini penyebab paling sering deploy PaaS gagal. Platform seperti Railway menyuntik
+`PORT` tapi **tidak** menyetel `HOST`, lalu proxy mereka menjangkau container lewat
+`eth0`. Server yang hanya bind ke `127.0.0.1` tidak akan pernah terlihat oleh
+proxy tersebut, dan healthcheck akan gagal terus walaupun log boot tetap
+menulis "siap".
+
+Jadi `HOST` memakai default platform:
+
+| Lingkungan | Default `HOST` |
+| --- | --- |
+| Lokal | `127.0.0.1` |
+| Railway, Render, Fly.io, Heroku | `0.0.0.0` |
+| `HOST` diset manual | nilai tersebut, apa pun-platformnya |
+
+Deteksi dilakukan lewat env var milik masing-masing platform (`RAILWAY_ENVIRONMENT`,
+`RENDER`, `FLY_APP_NAME`, `HEROKU_APP_NAME`). Kalau deploy Anda memakai platform
+lain, set `HOST=0.0.0.0` secara manual. Nilai yang disimpan di banner boot
+(`platform: Railway | bind: 0.0.0.0:8080`) berguna untuk memastikan diagnosis ini
+dari log, bukan dari tebakan.
+
+Default lokal sengaja tetap loopback: `/api/img` memproxy URL arbitrer, jadi
+membukanya ke seluruh jaringan LAN tanpa sadar adalah gift untuk siapa pun yang
+memindai port tersebut. Kalau memang perlu diakses dari perangkat lain di jaringan
+rumah, set `HOST=0.0.0.0` secara sadar, dan lebih baik lagi taruh di balik
+reverse proxy.
+
+### Filesystem
+
+`data/` tidak ikut ter-*commit* dan tidak ada di image container, jadi **setiap
+deploy mulai dari nol**: cache kosong dan taksonomi kosong. Ini tidak merusak apa
+pun, tapi implikasinya nyata:
+
+- **Cache kosong** → request pertama ke sumber Lambat dan mudah kena rate limit.
+- **Taksonomi kosong** → sidebar kategori berisi 0 entri sampai wallpaper mulai
+  ter-ingest. `/api/health` ikut melaporkan `totalCategories: 0`. Itu kondisi
+  normal pada deployment baru, bukan tanda kegagalan.
+- Folder `data/` tetap dibuat otomatis oleh server saat boot.
+
+Kalau category yang ter-ingest itu ingin bertahan, pasang **volume** dan arahkan
+ke `/app/data`. railway.json tidak menyebut volume karena volume bersifat per-project
+dan harus dibuat lewat dashboard.
+
+### Cache
+
+Cache disk di-sweep saat boot dan tiap 30 menit. Sweep menghapus entri yang
+kedaluwarsa atau versi cache-nya sudah usang. `/api/health` sengaja hanya
+*menghitung* cache, tidak menyapu: healthcheck dipanggil berulang kali, dan
+menyapu di dalam probe akan memblokir event loop. Angka `cache.disk` yang muncul
+di `/api/health` sudah di-memoisasi 60 detik.
+
+### Catatan sebelum dibuka ke publik
+
+`/api/img` memproxy URL arbitrer, jadi instance publik bisa saja dipakai untuk
+menyalahgunakan sumber gambar. Guard SSRF (lihat [Keamanan](#keamanan)) menahan
+jaringan internal, tapi URL publik yang berubah setiap menit bisa saja melewatinya.
+Untuk mengurangi risiko itu, taruh pembatas laju per-IP di depan aplikasi, dan
+pastikan pemakaian Anda sesuai ketentuan masing-masing sumber.
 
 ---
 
@@ -119,6 +184,8 @@ mendeteksi binary itu saat boot dan otomatis memakainya. Header `x-hoshiva-engin
 pada `/api/img` memberi tahu engine yang benar-benar dipakai:
 `waifu2x-binary` atau `sharp-waifu2x`. Bila binary gagal, sistem otomatis
 kembali ke `sharp` dan hanya menulis satu peringatan ke log.
+
+---
 
 ## Sumber gambar
 

@@ -13,6 +13,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const suites = [
   ['Guard SSRF', 'test-ssrf.js'],
   ['Taksonomi kategori', 'test-taxonomy.js'],
+  ['Rem kategori', 'test-budget.js'],
   ['Pipeline gambar', 'test-image.js'],
   ['Cache', 'test-cache.js'],
   ['Filter rasio', 'test-ratio.js'],

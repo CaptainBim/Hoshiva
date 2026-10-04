@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 const DIR = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hoshiva-cache-')), 'cache');
 process.env.HOSHIVA_CACHE_DIR = DIR;
 
-const { cacheGet, cacheSet, cached, cacheSweep } = await import('../server/cache.js');
+const { cacheGet, cacheSet, cached, cacheSweep, cacheStats } = await import('../server/cache.js');
 
 let pass = 0;
 const fail = [];
@@ -105,6 +105,20 @@ console.log('\n-- sweep membersihkan yang kedaluwarsa --');
   const r = cacheSweep();
   ok(r.removed >= 1, 'file kedaluwarsa dihapus', `removed=${r.removed} kept=${r.kept}`);
   ok(cacheGet('sweep-new') !== undefined, 'file yang masih hidup dipertahankan');
+}
+
+console.log('\n-- cacheStats(): probe health tidak boleh menyapu --');
+{
+  cacheSet('stats-old', { v: 1 }, -10);
+  const s1 = cacheStats();
+  ok(typeof s1.mem === 'number' && s1.mem >= 0, 'cacheStats().mem adalah angka', `mem=${s1.mem}`);
+  ok(typeof s1.disk === 'number' && s1.disk >= 0, 'cacheStats().disk adalah angka', `disk=${s1.disk}`);
+  ok(fs.readdirSync(DIR).length >= s1.disk, 'hitungan disk tidak melebihi file yang ada');
+  // File kedaluwarsa harus masih ada: stats hanya menghitung, tidak menghapus.
+  const stillThere = fs.readdirSync(DIR).some((f) => f.endsWith('.json'));
+  ok(stillThere, 'cacheStats tidak menghapus file');
+  const s2 = cacheStats();
+  ok(s2.disk === s1.disk, 'hitungan kedua mememoisasi (tidak berubah)', `${s1.disk} -> ${s2.disk}`);
 }
 
 console.log(`\n  Cache: ${pass} lulus, ${fail.length} gagal`);

@@ -1,12 +1,12 @@
 import express from 'express';
 import path from 'node:path';
-import { ROOT, PORT, HOST, SIZE_PRESETS, UPSCALE_MODES, SORTS, RATIOS } from './config.js';
+import { ROOT, PORT, HOST, PLATFORM, SIZE_PRESETS, UPSCALE_MODES, SORTS, RATIOS } from './config.js';
 import { searchSources, detailSource, defaultSourceOrder, publicSources, matchesRatio } from './sources.js';
 import {
   render, download, assertSafeUrl, waifu2xAvailable,
   MIN_CROP_FRAC, MIN_CROP_PX,
 } from './image.js';
-import { cached, cacheSweep } from './cache.js';
+import { cached, cacheSweep, cacheStats } from './cache.js';
 import * as taxonomy from './categories.js';
 
 const app = express();
@@ -71,7 +71,7 @@ app.get(
 app.get(
   '/api/health',
   wrap(async (_req, res) => {
-    res.json({ ok: true, uptime: process.uptime(), stats: taxonomy.stats(), cache: cacheSweep() });
+    res.json({ ok: true, uptime: process.uptime(), stats: taxonomy.stats(), cache: cacheStats() });
   })
 );
 
@@ -348,8 +348,25 @@ app.use((err, _req, res, _next) => {
 const swept = cacheSweep();
 console.log(`[hoshiva] cache sweep: -${swept.removed} / ${swept.kept} kept`);
 
+/**
+ * Sweep hanya sekali di boot akan menyisakan entri kedaluwarsa menumpuk di
+ * container yang hidup lama, jadi ulangi secara berkala. Berjeda longgar supaya
+ * tidak ikut memblokir event loop saat sedang sibuk.
+ */
+const SWEEP_MS = 30 * 60 * 1000;
+setInterval(() => {
+  try {
+    const r = cacheSweep();
+    if (r.removed) console.log(`[hoshiva] cache sweep: -${r.removed} / ${r.kept} kept`);
+  } catch {
+    /* ignore */
+  }
+}, SWEEP_MS).unref();
+
 app.listen(PORT, HOST, () => {
-  console.log(`\n  ✦ Hoshiva siap  →  http://${HOST}:${PORT}\n`);
+  const shown = HOST === '0.0.0.0' ? 'localhost' : HOST;
+  console.log(`\n  ✦ Hoshiva siap  →  http://${shown}:${PORT}\n`);
+  console.log(`    platform: ${PLATFORM}  |  bind: ${HOST}:${PORT}`);
   console.log(`    waifu2x binary: ${waifu2xAvailable() ? 'TERPASANG (dipakai)' : 'tidak ada (pakai emulasi sharp)'}`);
   console.log(`    taksonomi: ${taxonomy.stats().totalCategories} kategori aktif\n`);
 });
