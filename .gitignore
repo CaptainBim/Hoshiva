@@ -19,6 +19,13 @@ src/
 .env.*
 !.env.example
 
+# Railway CLI
+# railway.json (Config as Code) sengaja ikut ter-commit: isinya hanya
+# builder, start command, dan healthcheck, tidak ada credential.
+# Folder .railway/ berbeda: itu state lokal CLI, menunjuk ke project dan
+# environment spesifik. Milik tiap mesin, jadi jangan ikut ter-commit.
+.railway/
+
 # logs & OS junk
 *.log
 *.err
