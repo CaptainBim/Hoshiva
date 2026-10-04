@@ -272,6 +272,15 @@
             </select>
           </label>
           <p class="hint" id="screenHint"></p>
+          <label class="field" id="panField" hidden>
+            <span>Geser crop <em id="panVal">50%</em></span>
+            <input type="range" id="panRange" min="0" max="100" step="1" value="50"
+                   aria-describedby="panHint" />
+          </label>
+          <p class="hint" id="panHint" hidden>
+            Tengah sudah otomatis. Geser hanya kalau subjeknya meleset ke
+            salah satu sisi.
+          </p>
         </div>
       </div>
 

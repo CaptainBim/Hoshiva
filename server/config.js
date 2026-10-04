@@ -37,6 +37,24 @@ export const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
 /**
+ * Posisi crop untuk mode `cover`.
+ *
+ * Dulu hardcoded `attention`: sharp memilih area dengan entropi tertinggi, yaitu
+ * bagian paling "ramai". Untuk wallpaper itu sering salah — subjek karakter
+ * terpotong, atau yang terpilih justru background yang paling detail.
+ * Terukur pada tiga wallpaper nyata, `attention` menggeser framing pada
+ * 56-70% piksel dibanding `centre`, dan tidak konsisten dari gambar ke gambar.
+ *
+ * `centre` framingnya bisa ditebak, dan itulah yang benar untuk wallpaper: isi
+ * yang di tengah tetap di tengah. Nilai dari klien tetap diterima selama ada di
+ * daftar ini, jadi `attention` masih bisa diminta kalau memang diinginkan.
+ */
+export const CROP_POSITIONS = [
+  'centre', 'attention', 'entropy', 'top', 'bottom', 'left', 'right',
+];
+export const DEFAULT_CROP_POSITION = 'centre';
+
+/**
  * Preset ukuran wallpaper. `mode` menentukan cara fit:
  *  - cover  : potong/scalable memenuhi kotak ( wallpaper desktop )
  *  - contain: seluruh gambar muat di dalam canvas ( wallpaper tanpa crop )
@@ -48,12 +66,13 @@ export const SIZE_PRESETS = [
   { id: 'fhd', label: 'Full HD', w: 1920, h: 1080, mode: 'contain' },
   { id: 'qhd', label: 'QHD 2K', w: 2560, h: 1440, mode: 'contain' },
   { id: '4k', label: '4K UHD', w: 3840, h: 2160, mode: 'contain' },
-  { id: '5k', label: '5K', w: 5120, h: 2880, mode: 'contain' },
   { id: 'uw', label: 'Ultrawide 21:9', w: 3440, h: 1440, mode: 'cover' },
   { id: 'uw32', label: 'Super Ultrawide 32:9', w: 5120, h: 1440, mode: 'cover' },
   { id: 'squat', label: 'Square 1:1', w: 1440, h: 1440, mode: 'cover' },
-  { id: 'phone', label: 'Ponsel 19.5:9', w: 1170, h: 2532, mode: 'cover' },
-  { id: 'phone16', label: 'Ponsel 16:9', w: 1080, h: 1920, mode: 'cover' },
+  // Potret: dipotong dari sisi yang lebar. Ambil tengah, bukan `attention`,
+  // supaya wajah/subyek yang di tengah tidak bergeser unpredictably.
+  { id: 'phone', label: 'Ponsel 19.5:9', w: 1170, h: 2532, mode: 'cover', position: 'centre', hint: 'potong dari tengah' },
+  { id: 'phone16', label: 'Ponsel 16:9', w: 1080, h: 1920, mode: 'cover', position: 'centre', hint: 'potong dari tengah' },
   { id: 'ipad', label: 'iPad 4:3', w: 2048, h: 1536, mode: 'cover' },
   { id: 'original', label: 'Asli (Full Res)', mode: 'raw', hint: 'tanpa resize, unduh file asli' },
 ];

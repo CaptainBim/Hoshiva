@@ -1,6 +1,9 @@
 import express from 'express';
 import path from 'node:path';
-import { ROOT, PORT, HOST, PLATFORM, SIZE_PRESETS, UPSCALE_MODES, SORTS, RATIOS } from './config.js';
+import {
+  ROOT, PORT, HOST, PLATFORM, SIZE_PRESETS, UPSCALE_MODES, SORTS, RATIOS,
+  CROP_POSITIONS, DEFAULT_CROP_POSITION,
+} from './config.js';
 import { searchSources, detailSource, defaultSourceOrder, publicSources, matchesRatio } from './sources.js';
 import {
   render, download, assertSafeUrl, waifu2xAvailable,
@@ -276,7 +279,15 @@ app.get(
     }
 
     const cropKey = crop ? [crop.x, crop.y, crop.w, crop.h].map((v) => v.toFixed(4)).join(',') : '';
-    const key = `img:${url}:${w}:${h}:${mode}:${upscale}:${fm}:${quality}:${scale}:${cropKey}`;
+    // `pos` ikut masuk key: crop yang berbeda menghasilkan gambar berbeda, jadi
+    // tidak boleh saling memakai hasil cache.
+    const pos = CROP_POSITIONS.includes(req.query.pos) ? req.query.pos : DEFAULT_CROP_POSITION;
+    // `pan` ikut masuk key: geser berbeda menghasilkan gambar berbeda.
+    // String kosong harus berarti "tidak diberikan", bukan 0 — `Number('')`
+    // bernilai 0, yang akan diam-diam menggeser crop ke tepi paling kiri.
+    const pan = req.query.pan === '' ? null : num(req.query.pan, NaN);
+    const hasPan = pan !== null && Number.isFinite(pan);
+    const key = `img:${url}:${w}:${h}:${mode}:${upscale}:${fm}:${quality}:${scale}:${pos}:${hasPan ? pan : 'x'}:${cropKey}`;
     const out = await cached(key, num(req.query.ttl, 3600), () =>
       render(url, {
         w: num(w, 0),
@@ -286,6 +297,8 @@ app.get(
         fm: ['jpg', 'png', 'webp'].includes(fm) ? fm : undefined,
         quality: num(quality, 92),
         scale: num(scale, 2),
+        pos,
+        ...(hasPan ? { pan } : {}),
         crop,
       })
     );

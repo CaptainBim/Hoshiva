@@ -25,6 +25,16 @@ const state = {
   w: LS.w || 0,
   h: LS.h || 0,
   fit: LS.fit || 'cover',
+  /**
+   * Posisi crop saat mode cover. Preset Ponsel mengaturnya ke 'centre' supaya
+   * subjek di tengah tidak bergeser. Nilai lain tetap pakai default server.
+   */
+  pos: LS.pos || '',
+  /**
+   * Geser crop 0..100, 50 = tengah. Berlaku hanya untuk mode cover dan hanya
+   * di sumbu yang benar-benar dipotong; lihat updatePanVisibility().
+   */
+  pan: Number.isFinite(LS.pan) ? Math.min(Math.max(LS.pan, 0), 100) : 50,
   /** 'auto' = upscale hanya bila target lebih besar dari sumber. */
   upscale: LS.upscale || 'auto',
   /** Crop aktif (fraksi 0..1): {x, y, w, h}. null = tanpa crop. */
@@ -146,6 +156,14 @@ async function boot() {
   // <select> cara-fit harus ikut state tersimpan; kalau tidak, tampilan
   // dan nilai yang benar-benar dipakai saat render jadi tidak sinkron.
   dom.fitMode.value = state.fit;
+  dom.panRange.value = String(state.pan);
+  dom.panVal.textContent = `${state.pan}%`;
+  // Posisi crop diturunkan dari preset yang tersimpan, bukan dari nilai yang
+  // disimpan terpisah: presetlah satu-satunya sumber kebenaran. Kalau
+  // nilainya sama sekali belum ada (localStorage versi lama), tetap ikut preset.
+  if (LS.pos === undefined) {
+    state.pos = cfg.presets.find((p) => p.id === state.preset)?.position || '';
+  }
   dom.ratioSel.value = state.ratio;
   updateSizeBadge();
 
@@ -175,7 +193,7 @@ function buildPresets() {
           'data-preset': p.id,
           class: state.preset === p.id ? 'is-on' : '',
           title: p.hint || `${p.w || 'auto'}×${p.h || 'auto'} · ${p.mode}`,
-          onclick: () => applyPreset(p.id),
+          onclick: () => applyPreset(p.id, { openCrop: true }),
         },
         p.label
       )
@@ -189,9 +207,14 @@ function buildPresets() {
  * `state.sourcesStatus` diisi oleh loadSourcesStatus(). Sumber yang DOWN
  * disembunyikan supaya user tidak memilih sesuatu yang pasti gagal; kalau
  * tidak ada satu pun sumber hidup, hanya "Otomatis" yang ditampilkan.
+ *
+ * Labelnya cukup "Otomatis" saja. Keterangan "(semua sumber hidup)" dulu
+ * disertakan, tapi di panel sempit teks itu lebih banyak memakan ruang
+ * daripada yang ia jelaskan. "Otomatis" sudah di posisi pertama, di atas
+ * daftar sumber individual yang juga ditampilkan.
  */
 function buildSources() {
-  const AUTO = { id: 'auto', label: 'Otomatis (semua sumber hidup)', kind: 'auto' };
+  const AUTO = { id: 'auto', label: 'Otomatis', kind: 'auto' };
 
   // Status belum diketahui (halaman baru dimuat) -> tampilkan semua, nanti
   // dibangun ulang begitu /api/sources/status menjawab.
@@ -651,6 +674,8 @@ async function quickDownload(it) {
     w: state.fit === 'raw' ? 0 : state.w,
     h: state.fit === 'raw' ? 0 : state.h,
     mode: state.fit,
+    pos: state.pos,
+        pan: state.pan,
     upscale: useUpscale ? state.upscale : 'none',
     fm: 'jpg',
     quality: 95,
@@ -671,7 +696,7 @@ async function quickDownload(it) {
 
 /* ============================== SIZE & UPSCALE ============================== */
 
-function applyPreset(id) {
+function applyPreset(id, opts = {}) {
   const p = cfg.presets.find((x) => x.id === id);
   if (!p) return;
   state.preset = id;
@@ -687,6 +712,11 @@ function applyPreset(id) {
     state.h = p.h;
   }
   state.fit = p.mode;
+  // Hanya preset yang menyebutkannya yang mengaturnya. Preset lain dibiarkan
+  // kosong supaya ikut default server ('centre'), bukan mewarisi posisi dari
+  // preset sebelumnya. Mengganti preset tidak boleh diam-diam membawa posisi
+  // crop yang salah.
+  state.pos = p.position || '';
   qsa('[data-preset]', dom.presetRow).forEach((b) => b.classList.toggle('is-on', b.dataset.preset === id));
   dom.fitMode.value = state.fit;
   applySizeToInputs();
@@ -694,6 +724,10 @@ function applyPreset(id) {
   rerenderGrid();
   updateSizeBadge();
   updateDlInfo();
+  // Kotak crop dibuka lebih dulu. Begitu cropDraft ada, gambar yang ditampilkan
+  // menjadi file asli 1:1; kalau urutannya dibalik, refresh di bawah masih
+  // meminta versi ter-resize dan akan menimpanya.
+  if (opts.openCrop) openCropForSize();
   // Lightbox yang terbuka harus ikut berubah: gambar utama di-resize ke preset
   // baru, tanpa ini preview & bar dimensi tetap menampilkan ukuran lama.
   refreshLbIfOpen();
@@ -737,6 +771,46 @@ function applySizeToInputs() {
   dom.hNum.value = t.h || '';
   dom.wNum.placeholder = String(screenSize().w);
   dom.hNum.placeholder = String(screenSize().h);
+}
+
+/**
+ * Sumbu mana yang dipotong mode `cover` untuk gambar ini: 'x' (kiri/kanan),
+ * 'y' (atas/bawah), atau null kalau rasionya sudah cocok sehingga tidak ada
+ * yang dibuang.
+ *
+ * Geser hanya berguna di sumbu itu. Slider disembunyikan kalau tidak ada yang
+ * bisa digeser, karena slider yang diam-diam tidak melakukan apa-apa lebih
+ * buruk daripada tidak ada.
+ */
+function croppedAxis() {
+  if (state.fit !== 'cover') return null;
+  const s = srcSize();
+  const t = targetSize();
+  if (!s.w || !s.h || !t.w || !t.h) return null;
+  const d = s.w * t.h - s.h * t.w;
+  return d > 0 ? 'x' : d < 0 ? 'y' : null;
+}
+
+/** Tampilkan slider geser hanya kalau ada yang bisa digeser. */
+function updatePanVisibility() {
+  // Crop yang aktif menggantikan geser sepenuhnya: posisinya sudah ditentukan
+  // kotak, jadi slider akan jadi kontrol kedua yang sunyi tanpa efek.
+  const cropping = !!state.crop || !!state.cropDraft;
+  const axis = croppedAxis();
+  const show = axis !== null && !cropping;
+  dom.panField.hidden = !show;
+  dom.panHint.hidden = !show;
+  if (!show) return;
+  dom.panVal.textContent = `${state.pan}%`;
+  dom.panRange.value = String(state.pan);
+  dom.panRange.setAttribute(
+    'aria-label',
+    axis === 'x' ? 'Geser crop kiri kanan' : 'Geser crop atas bawah'
+  );
+  dom.panHint.textContent =
+    axis === 'x'
+      ? 'Tengah sudah otomatis. Geser hanya kalau subjeknya meleset ke kiri atau kanan.'
+      : 'Tengah sudah otomatis. Gambar ini dipotong atas-bawah, jadi geser ke atas atau bawah.';
 }
 
 /**
@@ -808,6 +882,8 @@ function persistFilters() {
   store.set('filters', {
     sort: state.sort, ratio: state.ratio, preset: state.preset,
     w: state.w, h: state.h, fit: state.fit, upscale: state.upscale,
+    pos: state.pos,
+        pan: state.pan,
   });
 }
 
@@ -856,6 +932,8 @@ function lbImageSrc(it = lbItem, step = 0) {
     w: state.fit === 'raw' ? 0 : state.w,
     h: state.fit === 'raw' ? 0 : state.h,
     mode: state.fit,
+    pos: state.pos,
+    pan: state.pan,
     upscale: state.upscale,
     fm: 'jpg',
     quality: 95,
@@ -890,11 +968,13 @@ async function paintLB({ sizeOnly = false } = {}) {
   const cropPx = state.crop && it.width
     ? { w: Math.round(state.crop.w * it.width), h: Math.round(state.crop.h * it.height) }
     : null;
+  const panAxis = croppedAxis();
   setKids(dom.specGrid,
     spec('Resolusi asli', `${it.width}×${it.height}`),
     spec('Target wallpaper', state.w ? `${state.w}×${state.h}` : 'tidak diubah'),
     spec('Cara pas', titleCase(state.fit)),
     spec('Crop', state.crop ? `${cropPx.w}×${cropPx.h}` : 'tidak ada'),
+    panAxis ? spec('Geser crop', `${state.pan}% ke ${panAxis === 'x' ? 'samping' : 'atas-bawah'}`) : null,
     spec('Rasio', `${it.ratio}:1`),
     spec('Orientasi', titleCase(it.orientation)),
     spec('Mega piksel', `${it.mp} MP`),
@@ -904,6 +984,10 @@ async function paintLB({ sizeOnly = false } = {}) {
     spec('Warna dominan', it.colors?.length ? it.colors.slice(0, 3).join(' ') : '—'),
     spec('Ditambahkan', fmtDate(it.createdAt))
   );
+
+  // Geser crop ikut berubah setiap kali ukuran, mode, atau gambar yang dibuka
+  // berubah, jadi satu tempat ini cukup untuk semuanya.
+  updatePanVisibility();
 
   // Catatan upscale — mode fully otomatis, tidak ada pilihan.
   const factor = it.width && state.w ? state.w / it.width : null;
@@ -934,6 +1018,7 @@ async function paintLB({ sizeOnly = false } = {}) {
 
   if (sizeOnly) {
     updateLbImage();
+    requestAnimationFrame(updateCropFrame);
     return;
   }
 
@@ -944,6 +1029,10 @@ async function paintLB({ sizeOnly = false } = {}) {
 
   loadSimilar(it);
   updateLbImage();
+  // Panel info baru terisi di sini, jadi tinggi stage bisa berubah lagi
+  // setelah gambar selesai dimuat. Kotak crop harus menggambar ulang supaya
+  // tidak tertinggal di geometri yang sudah tidak berlaku.
+  requestAnimationFrame(updateCropFrame);
 }
 
 function spec(k, v) {
@@ -1038,6 +1127,8 @@ function updateDlInfo() {
     w: state.fit === 'raw' ? 0 : state.w,
     h: state.fit === 'raw' ? 0 : state.h,
     mode: state.fit,
+    pos: state.pos,
+        pan: state.pan,
     upscale: doUpscale ? state.upscale : 'none',
     fm: 'jpg',
     quality: 96,
@@ -1053,23 +1144,36 @@ function updateDlInfo() {
   dom.origBtn.href = it.full || it.sample;
 }
 
+let lbImageGen = 0;
 function updateLbImage() {
   const src = lbImageSrc();
   if (!src) return;
+  // Slider geser, crop, dan preset bisa menyalin beberapa permintaan dalam
+  // hitungan milidetik. Tanpa penomoran, jawaban yang telat akan menimpa gambar
+  // yang benar dan preview menampilkan hal yang sudah tidak berlaku.
+  const gen = ++lbImageGen;
   dom.lbSpin.hidden = false;
   dom.lbImg.classList.remove('is-actual');
   const tmp = new Image();
   const done = () => {
+    if (gen !== lbImageGen) return; // permintaan lama, sudah tidak relevan
     dom.lbImg.src = src;
     dom.lbSpin.hidden = true;
-    if (state.cropDraft) requestAnimationFrame(updateCropFrame);
+    if (!state.cropDraft) return;
+    // Kotak crop mengikuti kotak elemen img, dan kotak itu baru benar begitu
+    // sumber baru benar-benar terpasang di elemen. Event load adalah penanda
+    // itu; satu frame saja belum tentu cukup karena gambar masih di-decode.
+    dom.lbImg.addEventListener('load', () => updateCropFrame(), { once: true });
+    requestAnimationFrame(() => requestAnimationFrame(updateCropFrame));
   };
   tmp.onload = done;
   tmp.onerror = () => {
+    if (gen !== lbImageGen) return;
     // fallback ke sample
     if (lbItem?.sample) {
       dom.lbImg.src = imgUrl(lbItem.sample, {
-        w: state.w, h: state.h, mode: state.fit, upscale: state.upscale,
+        w: state.w, h: state.h, mode: state.fit, pos: state.pos,
+        pan: state.pan, upscale: state.upscale,
         ...(state.crop ? { crop: state.crop } : {}),
       });
     }
@@ -1135,7 +1239,12 @@ function clampCrop(c) {
   return { x, y, w, h };
 }
 
-/** Area gambar (bukan area img 100%-contain) dalam koordinat stage. */
+/**
+ * Area gambar (bukan area img 100%-contain) dalam koordinat stage.
+ *
+ * `max-width/max-height: 100%` membuat kotak elemen mengikuti rasio intrinsik,
+ * jadi kotak elemen sama dengan kotak yang benar-benar tergambar.
+ */
 function imageRect() {
   const stage = dom.lbStage.getBoundingClientRect();
   const img = dom.lbImg.getBoundingClientRect();
@@ -1165,10 +1274,27 @@ function updateCropFrame() {
   }
 }
 
+/**
+ * Kotak crop harus selalu mengikuti ukuran gambar di layar. ResizeObserver
+ * dipasang sekali karena gambar bisa berganti sumber, diperbesar, atau
+ * stage-nya berubah ukuran tanpa satu pun memanggil updateCropFrame(). Tanpa
+ * ini kotak tertinggal di geometri gambar sebelumnya dan crop jadi salah area.
+ */
+let cropFrameWatch = null;
+function watchCropFrame() {
+  if (cropFrameWatch || typeof ResizeObserver === 'undefined') return;
+  cropFrameWatch = new ResizeObserver(() => updateCropFrame());
+  cropFrameWatch.observe(dom.lbImg);
+}
+
 /** Status tombol & label di panel crop. */
 function paintCropUi() {
   const editing = !!state.cropDraft;
   const it = lbItem;
+  // Status geser ikut bergantung pada ada-tidaknya crop, jadi harus dihitung
+  // di sini juga. Kalau hanya di paintLB(), membuka crop dari preset tidak
+  // pernah menyegerakannya dan slider lama masih kelihatan.
+  updatePanVisibility();
   dom.cropper.hidden = !editing;
   dom.tbCrop.classList.toggle('is-on', editing);
   dom.tbCrop.setAttribute('aria-pressed', String(editing));
@@ -1190,11 +1316,100 @@ function paintCropUi() {
   if (!it) return;
   const minW = Math.round(cropMinFrac('width') * it.width);
   const minH = Math.round(cropMinFrac('height') * it.height);
+  // Kalau rasio kotak sudah sama dengan ukuran wallpaper, sebut saja. Orang
+  // perlu tahu bahwa menggeser kotak tidak mengubah ukuran hasilnya.
+  const t = targetSize();
+  const d = state.cropDraft;
+  const matchesTarget =
+    editing && d && t.w && t.h
+      ? Math.abs((d.w * it.width) / (d.h * it.height) - t.w / t.h) < 0.02
+      : false;
+  // Rasionya tidak selalu bisa persis sama dengan ukuran: server menolak crop
+  // di bawah 320px per sisi, dan pada gambar kecil frame ideal bisa lebih
+  // kecil dari itu. Kotaknya lalu dijepit ke batas minimum dan rasionya
+  // meleset. Itu harus disebut, kalau tidak orang mengira ukurannya tepat
+  // padahal tidak.
+  const atFloor =
+    editing && d &&
+    (Math.abs(d.w - cropMinFrac('width')) < 1e-6 ||
+     Math.abs(d.h - cropMinFrac('height')) < 1e-6);
+  const note = matchesTarget
+    ? ` Rasio kotak sudah sama dengan ukuran ${t.w}×${t.h}, jadi hasilnya persis sebesar itu.`
+    : atFloor
+      ? ' Rasio kotak tidak bisa persis sama dengan ukuran: bagian yang dipotong ' +
+        'akan terlalu kecil untuk dijadikan wallpaper, jadi rasio dibatasi server.'
+      : '';
   dom.cropHint.innerHTML = editing
     ? 'Seret kotak atau sudutnya. Area di luar kotak akan dipotong saat diunduh. ' +
-      `Minimal <b>${minW}×${minH}px</b> dari ${it.width}×${it.height}.`
+      `Minimal <b>${minW}×${minH}px</b> dari ${it.width}×${it.height}.` + note
     : 'Tekan <b>Mulai crop</b> lalu seret kotak di gambar untuk memotong bagian yang diinginkan. ' +
       `Minimal <b>${minW}×${minH}px</b> — crop 100×100 dari wallpaper besar tidak berguna sebagai wallpaper.`;
+}
+
+/**
+ * Frame crop dengan rasio ukuran wallpaper aktif, sebesar mungkin dan di tengah.
+ *
+ * Dipakai setiap kali ukuran berubah. Tanpa ini, mode `cover` harus memilih
+ * framing sendiri dan sering memotong wajah karakter, padahal yang tinggal
+ * dibuang hanya bagian tepi.
+ *
+ * Titik tengah crop yang sudah ada ikut dipertahankan, jadi mengganti ukuran
+ * tidak menghapus hasil kerja orang.
+ */
+function cropForTarget() {
+  const it = lbItem;
+  if (!it || !it.width || !it.height) return null;
+  const t = targetSize();
+  if (!t.w || !t.h) return null;
+  const ar = t.w / t.h;
+  // Rasio yang menentukan sisi mana yang penuh. Sumber lebih lebar dari target
+  // berarti tinggi yang jadi pembatas, dan sebaliknya.
+  let w;
+  let h;
+  if (it.width / it.height > ar) {
+    h = 1;
+    w = (ar * it.height) / it.width;
+  } else {
+    w = 1;
+    h = it.width / (ar * it.height);
+  }
+  // Kombinasi gambar dan rasio ekstrem bisa menghasilkan frame di bawah batas
+  // server. Angkat ke batas minimum; sisanya berarti rasionya tidak persis.
+  w = Math.max(w, cropMinFrac('width'));
+  h = Math.max(h, cropMinFrac('height'));
+  const prev = state.cropDraft || state.crop;
+  const cx = prev ? prev.x + prev.w / 2 : 0.5;
+  const cy = prev ? prev.y + prev.h / 2 : 0.5;
+  return clampCrop({ x: cx - w / 2, y: cy - h / 2, w, h });
+}
+
+/**
+ * Buka kotak crop yang sudah disetel ke rasio ukuran yang baru dipilih.
+ *
+ * Dipanggil setiap kali ukuran berubah, termasuk saat kotak sudah terbuka.
+ * Kalau menolak jalan saat kotak ada, memilih preset kedua diam-diam tidak
+ * mengubah apa pun dan kotak tetap memakai rasio ukuran yang lama.
+ *
+ * Hanya jalan saat lightbox terbuka: crop menentukan bagian gambar, bukan
+ * ukurannya. Tanpa target tidak ada rasio untuk diikuti, jadi cropper yang
+ * dibuka hanya jadi kotak tanpa arah.
+ */
+function openCropForSize() {
+  if (!lbItem) return false;
+  // Ukuran "asli" dan mode raw tidak punya target, jadi tidak ada yang bisa
+  // disetel dan crop akan menggantung di atas gambar tanpa hasil.
+  if (state.fit === 'raw' || !state.w || !state.h) return false;
+  const c = cropForTarget();
+  if (!c) return false;
+  // Kalau kotaknya sudah terbuka, gambar yang tampil sudah file asli 1:1 dan
+  // tidak perlu dimuat ulang; yang perlu digambar ulang hanya kotaknya.
+  const baru = !state.cropDraft;
+  state.cropDraft = c;
+  paintCropUi();
+  if (!baru) return true;
+  updateLbImage();
+  toast('Kotak crop sudah disesuaikan ukurannya. Seret untuk memilih bagian gambar.', 'info', '✂️');
+  return true;
 }
 
 function startCrop() {
@@ -1216,6 +1431,10 @@ function applyCrop() {
   }
   state.crop = c;
   state.cropDraft = null;
+  // Kotak crop sudah menentukan bagian gambarnya, jadi geseran otomatis tidak
+  // boleh ikut menentukan lagi. Kalau tidak, ada dua kontrol yang memilih
+  // region dan hasilnya jadi tidak bisa ditebak.
+  state.pan = 50;
   paintCropUi();
   persistCrop();
   paintLB({ sizeOnly: true });
@@ -1298,8 +1517,9 @@ function onCropPointerDown(e) {
       if (mode.includes('e')) { next.w = start.w + dx; }
       if (mode.includes('n')) { next.y = start.y + dy; next.h = start.h - dy; }
       if (mode.includes('s')) { next.h = start.h + dy; }
-      // Crop harus "secara ukuran": tiap sisi punya lantai, jadi kotak
-      // sekecil 100×100 tidak mungkin terjadi lewat drag.
+      // Saat satu sudut digeser, hanya sisi yang ikut sudut itu yang berubah
+      // ukuran. Tiap sisi punya lantai, jadi kotak sekecil 100x100 tidak
+      // mungkin terjadi lewat drag.
       next.w = Math.max(next.w, cropMinFrac('width'));
       next.h = Math.max(next.h, cropMinFrac('height'));
     }
@@ -1426,6 +1646,7 @@ async function checkFreshInFeed() {
 /* ============================== WIRING ============================== */
 
 function wire() {
+  watchCropFrame();
   dom.searchForm.addEventListener('submit', (e) => {
     e.preventDefault();
     state.q = dom.q.value.trim();
@@ -1500,10 +1721,19 @@ function wire() {
   };
   dom.wNum.addEventListener('input', onSizeInput);
   dom.hNum.addEventListener('input', onSizeInput);
-  dom.wNum.addEventListener('change', persistFilters);
-  dom.hNum.addEventListener('change', persistFilters);
+  // `change` baru menyala saat angka selesai diketik (blur atau Enter), bukan
+  // tiap ketikan. Kalau crop box dibuka di `input`, mengetik "1920" akan
+  // membukanya tiga kali dan menutupi preview di tengah jalan.
+  dom.wNum.addEventListener('change', () => {
+    persistFilters();
+    openCropForSize();
+  });
+  dom.hNum.addEventListener('change', () => {
+    persistFilters();
+    openCropForSize();
+  });
 
-  dom.btnScreen.addEventListener('click', () => applyPreset('screen'));
+  dom.btnScreen.addEventListener('click', () => applyPreset('screen', { openCrop: true }));
   dom.btnSwap.addEventListener('click', () => {
     [state.w, state.h] = [state.h, state.w];
     state.preset = 'custom';
@@ -1519,8 +1749,22 @@ function wire() {
 
   dom.fitMode.addEventListener('change', () => {
     state.fit = dom.fitMode.value;
+    // Geser hanya berlaku di mode cover. Reset ke tengah supaya kembali ke
+    // cover nanti tidak diam-diam memakai geseran dari mode lain.
+    if (state.fit !== 'cover') state.pan = 50;
     persistFilters();
     renderGrid();
+    updateDlInfo();
+    refreshLbIfOpen();
+  });
+
+  // geser crop - hanya berlaku untuk mode cover, jadi nilainya dikembalikan
+  // ke tengah begitu mode berubah agar tidak ada nilai tersembunyi yang
+  // tiba-tiba aktif lagi.
+  dom.panRange.addEventListener('input', () => {
+    state.pan = Math.min(Math.max(Number(dom.panRange.value) || 0, 0), 100);
+    dom.panVal.textContent = `${state.pan}%`;
+    persistFilters();
     updateDlInfo();
     refreshLbIfOpen();
   });
@@ -1609,6 +1853,8 @@ function wire() {
     dom.tbActual.classList.add('is-on');
     dom.lbImg.src = lbItem?.full || lbItem?.sample || '';
     dom.tbZoom.textContent = '100%';
+    // Ukuran elemen berubah total (is-actual melepas batas max-width/height).
+    updateCropFrame();
   });
   dom.tbZoomIn.addEventListener('click', () => zoom(1.25));
   dom.tbZoomOut.addEventListener('click', () => zoom(0.8));
@@ -1738,6 +1984,9 @@ function zoom(k) {
   dom.lbImg.classList.add('is-actual');
   dom.tbActual.classList.add('is-on');
   dom.tbZoom.textContent = `${Math.round(next * 100)}%`;
+  // Transform tidak memicu ResizeObserver, jadi posisi kotak crop harus
+  // dihitung ulang secara manual di sini.
+  updateCropFrame();
 }
 
 /* ============================== START ============================== */

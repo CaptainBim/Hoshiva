@@ -3,7 +3,9 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { UA, FETCH_TIMEOUT, MAX_OUTPUT_PX } from './config.js';
+import {
+  UA, FETCH_TIMEOUT, MAX_OUTPUT_PX, CROP_POSITIONS, DEFAULT_CROP_POSITION,
+} from './config.js';
 
 /* ------------------------------------------------------------------ *
  * Image pipeline Hoshiva
@@ -304,6 +306,67 @@ export function resolveCrop(meta, crop) {
 }
 
 /**
+ * Posisi crop untuk mode `cover`, dibatasi ke daftar yang dipahami sharp.
+ * Nilai di luar daftar (termasuk string dari klien yang nakal) jatuh ke default,
+ * bukan diteruskan mentah ke sharp.
+ */
+function cropPosition(pos) {
+  return CROP_POSITIONS.includes(pos) ? pos : DEFAULT_CROP_POSITION;
+}
+
+/**
+ * Nilai geser 0..100, atau null kalau tidak diberikan.
+ * 50 = tengah, 0 = sisi kiri/atas, 100 = sisi kanan/bawah.
+ */
+export function panValue(p) {
+  if (p === undefined || p === null || p === '') return null;
+  const n = Number(p);
+  return Number.isFinite(n) ? Math.min(Math.max(n, 0), 100) : null;
+}
+
+/**
+ * Region `cover` untuk geser `pan`, dalam piksel. Null kalau tidak ada yang
+ * perlu dipotong.
+ *
+ * Sumbu yang dipotong ditentukan perbandingan rasio: sumber lebih lebar dari
+ * target berarti sisi kiri/kanan yang dibuang, dan sebaliknya. `pan` bergerak
+ * di sumbu itu saja. Menggeser sumbu yang tidak dipotong tidak mengubah apa
+ * pun, jadi slider-nya akan terlihat tidak berfungsi.
+ *
+ * sharp hanya menerima posisi bernama atau gravity bulat (0..3600), bukan
+ * offset pecahan, jadi regionnya dihitung di sini lalu diberikan lewat
+ * `extract()`.
+ */
+export function coverRegion(srcW, srcH, w, h, pan) {
+  if (!srcW || !srcH || !w || !h) return null;
+  // -1 = seluruh ruang ke kiri/atas, 0 = tengah, 1 = ke kanan/bawah.
+  const t = (pan - 50) / 50;
+  const shift = (room) => Math.round(room * (0.5 + t / 2));
+  let left, top, width, height;
+  if (srcW * h > srcH * w) {
+    // Sumber lebih lebar: buang kiri/kanan.
+    width = Math.max(1, Math.min(srcW, Math.round((srcH * w) / h)));
+    const room = srcW - width;
+    if (room <= 0) return null; // rasio sudah cocok, tidak ada yang bisa digeser
+    height = srcH;
+    top = 0;
+    left = shift(room);
+  } else {
+    // Sumber lebih tinggi: buang atas/bawah.
+    height = Math.max(1, Math.min(srcH, Math.round((srcW * h) / w)));
+    const room = srcH - height;
+    if (room <= 0) return null;
+    width = srcW;
+    left = 0;
+    top = shift(room);
+  }
+  // Pembulatan bisa menyinggung tepi; jepit agar extract() tidak keluar gambar.
+  left = Math.min(Math.max(left, 0), srcW - width);
+  top = Math.min(Math.max(top, 0), srcH - height);
+  return { left, top, width, height };
+}
+
+/**
  * @param {Buffer} buffer  gambar sumber
  * @param {object} opt
  *   w,h            target size (opsional)
@@ -311,6 +374,8 @@ export function resolveCrop(meta, crop) {
  *   upscale        none | waifu2x | anime
  *   fm             webp | jpg | png (default: jpg, png bila ada alpha)
  *   quality        1-100 (default 92)
+ *   pos            posisi crop saat mode cover (default: centre)
+ *   pan            geser crop 0..100, 50 = tengah. Mengalahkan `pos`.
  *   crop           {x,y,w,h} fraksi 0..1 (opsional), dipakai sebelum resize
  */
 export async function transform(buffer, opt = {}) {
@@ -338,6 +403,9 @@ export async function transform(buffer, opt = {}) {
   const w = clampDim(opt.w);
   const h = clampDim(opt.h);
   let resize = null;
+  // Region geser manual untuk mode cover. Diperlukan di luar cabang resize
+  // supaya bisa diteruskan ke extract() di bawah.
+  let region = null;
 
   if (mode === 'raw') {
     resize = null; // unduh apa adanya
@@ -349,13 +417,19 @@ export async function transform(buffer, opt = {}) {
       resize = { width: clampDim(srcW * factor), height: clampDim(srcH * factor), kernel: 'lanczos3' };
     }
   } else if (w && h) {
-    resize = mode === 'cover'
-      ? { width: w, height: h, fit: 'cover', position: 'attention', kernel: 'lanczos3' }
-      : mode === 'height' || mode === 'width'
-        ? (mode === 'width'
-            ? { width: w, kernel: 'lanczos3' }
-            : { height: h, kernel: 'lanczos3' })
-        : { width: w, height: h, fit: 'contain', background: { r: 12, g: 13, b: 20, alpha: 1 }, kernel: 'lanczos3' };
+    const pan = mode === 'cover' ? panValue(opt.pan) : null;
+    region = pan === null ? null : coverRegion(srcW, srcH, w, h, pan);
+    resize = region
+      // Region sudah persis rasio target, jadi resize di bawah tidak
+      // perlu memotong apa pun dan `position` tidak relevan lagi.
+      ? { width: w, height: h, fit: 'cover', kernel: 'lanczos3' }
+      : mode === 'cover'
+        ? { width: w, height: h, fit: 'cover', position: cropPosition(opt.pos), kernel: 'lanczos3' }
+        : mode === 'height' || mode === 'width'
+          ? (mode === 'width'
+              ? { width: w, kernel: 'lanczos3' }
+              : { height: h, kernel: 'lanczos3' })
+          : { width: w, height: h, fit: 'contain', background: { r: 12, g: 13, b: 20, alpha: 1 }, kernel: 'lanczos3' };
   } else if (w) {
     // Hanya lebar: kunci lebar, tinggi mengikuti aspect ratio.
     resize = { width: w, kernel: 'lanczos3' };
@@ -370,6 +444,7 @@ export async function transform(buffer, opt = {}) {
   //    lalu sharpen sesudahnya)
   let img = sharp(buffer, { failOn: 'none' });
   if (crop) img = img.extract(crop);
+  if (region) img = img.extract(region);
   if (profile?.denoise && upscaling) img = img.median(profile.denoise);
   if (resize) img = img.resize(resize);
 
