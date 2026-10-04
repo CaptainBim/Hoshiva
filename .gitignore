@@ -19,12 +19,19 @@ src/
 .env.*
 !.env.example
 
-# Railway CLI
-# railway.json (Config as Code) sengaja ikut ter-commit: isinya hanya
-# builder, start command, dan healthcheck, tidak ada credential.
-# Folder .railway/ berbeda: itu state lokal CLI, menunjuk ke project dan
-# environment spesifik. Milik tiap mesin, jadi jangan ikut ter-commit.
-.railway/
+# Railway
+# railway.json (Config as Code) ikut ter-commit: isinya hanya builder, start
+# command, healthcheck, dan restart policy. Tidak ada credential di dalamnya.
+#
+# .railway/ Mostly berisi state lokal CLI yang menunjuk ke project dan
+# environment spesifik, jadi jangan ikut ter-commit. Kalau nanti repo ini
+# pindah ke Infrastructure as Code, railway.ts WAJIB ikut ter-commit supaya
+# Railway bisa membacanya, jadi file itu dikecualikan. Perhatikan bahwa
+# `railway config migrate` menamai service dari nama folder, bukan nama
+# service sebenarnya, dan plan-nya bisa Removesumber repo GitHub sehingga
+# deploy otomatis mati - periksa `railway config plan` sebelum apply.
+.railway/*
+!.railway/railway.ts
 
 # logs & OS junk
 *.log
