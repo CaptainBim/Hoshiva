@@ -8,51 +8,22 @@ import { UA, FETCH_TIMEOUT } from './config.js';
  *     width, height, ratio, orientation, mp, rating, score,
  *     tags[], createdAt, pageUrl, author, colors? }
  *
- * Sumber "booru" (gelbooru/safebooru/...) memakai DAPI yang identik,
- * jadi satu adapter cukup untuk semuanya.
+ * Sumber "booru" memakai DAPI yang identik, jadi satu adapter cukup untuk
+ * semuanya.
+ *
+ * Catatan: gelbooru, konachan, rule34, dan xbooru sudah dihapus. Sertifikat
+ * TLS keempatnya kedaluwarsa 22 Januari 2025 dan domainnya kini dialihkan ke
+ * halaman ISP pihak ketiga, jadi tidak lagi menjadi booru yang bisa dipakai.
  * ------------------------------------------------------------------ */
 
 export const BOORU_SOURCES = [
-  {
-    id: 'gelbooru',
-    label: 'Gelbooru',
-    base: 'https://gelbooru.com',
-    kind: 'booru',
-    wallpaperTags: ['wallpaper', 'wallpaper_hd', 'background'],
-    priority: 1,
-  },
   {
     id: 'safebooru',
     label: 'Safebooru',
     base: 'https://safebooru.org',
     kind: 'booru',
     wallpaperTags: ['wallpaper', 'wallpaper_hd'],
-    priority: 2,
-  },
-  {
-    id: 'rule34',
-    label: 'Rule34',
-    base: 'https://api.rule34.xxx',
-    kind: 'booru',
-    wallpaperTags: ['wallpaper', 'wallpaper_hd', 'background'],
-    purity: 'nsfw',
-    priority: 5,
-  },
-  {
-    id: 'xbooru',
-    label: 'Xbooru',
-    base: 'https://xbooru.com',
-    kind: 'booru',
-    wallpaperTags: ['wallpaper'],
-    priority: 4,
-  },
-  {
-    id: 'konachan',
-    label: 'Konachan',
-    base: 'https://konachan.com',
-    kind: 'booru',
-    wallpaperTags: ['wallpaper'],
-    priority: 3,
+    priority: 1,
   },
 ];
 

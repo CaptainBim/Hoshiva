@@ -51,7 +51,7 @@ const ALLOW = [
   ['https://wallhaven.cc/a.jpg', 'wallhaven'],
   ['https://safebooru.org/x.png', 'safebooru'],
   ['https://i.ytimg.com/x.jpg', 'ytimg'],
-  ['https://gelbooru.com/x.png', 'gelbooru'],
+  ['https://www.reddit.com/x.png', 'host publik lain'],
   ['http://8.8.8.8/x', 'IPv4 publik'],
   ['http://1.1.1.1/x', 'IPv4 publik'],
   ['http://172.15.0.1/x', '172.15 di luar 172.16/12'],
