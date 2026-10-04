@@ -71,7 +71,7 @@ Windows/macOS/Linux sehingga tidak perlu compiler.
 | --- | --- |
 | `npm start` | jalankan server produksi |
 | `npm run dev` | jalankan dengan `--watch`, auto-reload |
-| `npm test` | test unit (tanpa server): SSRF, taksonomi, pipeline gambar, cache, filter rasio |
+| `npm test` | test unit (tanpa server): SSRF, taksonomi, rem kategori, pipeline gambar, cache, filter rasio |
 | `npm run test:api` | test endpoint — **server harus sudah jalan** |
 | `npm run test:ssrf` | hanya test guard SSRF |
 | `npm run test:taxonomy` | hanya test aturan kategori otomatis |
@@ -89,6 +89,15 @@ Windows/macOS/Linux sehingga tidak perlu compiler.
 | `FETCH_TIMEOUT` | `15000` | timeout fetch ke sumber, dalam ms |
 | `MAX_OUTPUT_PX` | `12000` | batas sisi terpanjang hasil resize/upscale |
 | `WAIFU2X_PATH` | — | path absolut executable `waifu2x-ncnn-vulkan` |
+| `HOSHIVA_CACHE_DIR` | `data/cache` | lokasi cache disk |
+| `HOSHIVA_TAXONOMY_FILE` | `data/taxonomy.json` | lokasi file taksonomi |
+| `HOSHIVA_LOGO_SRC` | — | sumber logo untuk `npm run logo*` |
+| `HOSHIVA_URL` | `http://127.0.0.1:4173` | target server untuk `npm run test:api` |
+
+Folder `data/` dibuat otomatis saat boot, jadi tidak perlu dibuat manual. Kalau
+dipakai di produksi, set `HOST=0.0.0.0` dan taruh di belakang reverse proxy —
+`/api/img` memproxy URL arbitrer, jadi guard SSRF adalah satu-satunya penghalang
+antar jaringan.
 
 ---
 
@@ -113,14 +122,15 @@ kembali ke `sharp` dan hanya menulis satu peringatan ke log.
 
 ## Sumber gambar
 
-| Sumber | Jenis | Status di jaringan ini |
-| --- | --- | --- |
-| Wallhaven | Wallhaven API | ✅ hidup |
-| Safebooru | DAPI (booru) | ✅ hidup |
+| Sumber | Jenis |
+| --- | --- |
+| Wallhaven | Wallhaven API |
+| Safebooru | DAPI (booru) |
 
 Hoshiva dirancang multi-sources: sumber yang gagal akan dilewati dan ditampilkan
 sebagai DOWN di panel status, sementara sumber yang hidup tetap melayani
-permintaan.
+permintaan. Status dihitung saat boot dan saat `/api/sources/status` dipanggil,
+jadi tidak mengasumsikan jaringan tempat Hoshiva dijalankan.
 
 ### Menambah sumber baru
 
@@ -224,7 +234,7 @@ lewat set `DUMMY_TAGS`, bukan regex.
 Regex untuk kata seperti `character` atau `artist` sengaja tidak dipakai:
 suffix `(character)`, `(series)`, `(artist)`, dan `(creature)` di Danbooru
 adalah penanda legitimasi, bukan metadata. Memblokirnya secara wildcard ikut
-mematikan entity asli, termasuk `Idolmaster Million Live! Theater Days` (869 hit).
+mematikan nama series dan karakter yang sah.
 
 `DUMMY_TAGS` juga dipakai `isUsefulTag`, bukan hanya `canPromote`, supaya
 placeholder ini tidak muncul di panel trending.
@@ -239,17 +249,16 @@ Kata waktu seperti `day` dan `days` ada di set terpisah `SCENE_TIME_EXACT`,
 yang hanya menolak tag tersebut kalau seluruh tag persis sama. Jadi `day`
 ditolak, tapi `Theater Days` tetap boleh.
 
-### Dampak
+### Catatan untuk pemakaian baru
 
-| | Sebelum | Sesudah |
-| --- | --- | --- |
-| Kategori otomatis | 758 | 400 |
-| Total kategori | 770 | 412 |
-| Payload taksonomi | 69,3 KB | 41,9 KB |
+Jumlah kategori bergantung pada data yang sudah ter-ingest, jadi milik Anda akan
+berbeda dari mesin mana pun. Yang penting mekanismenya: cap tidak memangkas
+membuta tuli, dan kontraksi payloadnya datang dari noise yang tersingkir sendiri
+lewat ambang, bukan dari batas yang dipaksakan.
 
-Kontraksi 40% itu gratis: bukan karena kategori dibuang membuta tuli, tapi
-karena 61% kategori sebelumnya adalah noise (439 dari 726 punya 12 hit atau
-kurang, didominasi tag dummy).
+Taksonomi dibangun dari nol saat pertama dijalankan, lalu bertambah seiring
+wallpaper masuk. Jadi di pemakaian pertama kategorinya masih sedikit, dan itu
+normal.
 
 ---
 
@@ -266,96 +275,23 @@ supaya tidak ada request tambahan dan tidak ada kedipan saat tema berganti.
 
 README memakai varian gelap (`logo-dark.png`).
 
-Perhatikan tinggi header berbeda antara varian: logo terang lebih rapat, logo
-gelap lebih longgar. Keduanya sudah di-trim ke bounding box isinya, jadi tidak
-perlu adjusting per tema di CSS.
+### Varian gelap dan latar gelap
 
-### Kenapa logo gelap perlu lift luminansi
+Varian gelap dibangun dari sumber berlatar solid: script hanya membuang latar
+dengan flood-fill, semua warna di dalam huruf ikut terbawa apa adanya. Padahal
+isi logo itu cyan gelap `rgb(0,96,256)` yang nyaris hilang di atas
+`rgb(8,8,15)`, apalagi di footer yang opacity-nya dikurangi. Karena itu
+`scripts/logo-theme.js` menaikkan luminansi HSL piksel jenuh sampai ambang
+`MIN_L`, dengan Hue dan Saturation tetap utuh.
 
-Varian gelap dibangun dari sumber berlatar solid (`logo terang.png`, kanvas
-2000x2000). Script aslinya hanya membuang latar dengan flood-fill; semua warna
-di dalam huruf ikut terbawa apa adanya. Padahal isi logo itu **cyan gelap**
-`rgb(0,96,256)` yang hanya reads 3,9:1 di atas `rgb(8,8,15)`, dan di footer
-yang opacity-nya dikurangi cyan itu efektif tinggal 2,2:1.
+Jadi jangan dikembalikan ke warna aslinya kalau kelihatan "ditimpa" di layar
+hampir hitam. Itu memang disengaja.
 
-Gejalanya mudah terlewat: 24% piksel logo berwarna putih tetap terang, jadi
-pengukuran kontras yang mengambil piksel putih terlihat bagus (8,59:1) padahal
-59% logo, yaitu bagian cyan, lenyap di latar hampir hitam.
+Perhatikan juga tinggi kedua varian header berbeda: logo terang lebih rapat,
+logo gelap lebih longgar. Keduanya sudah di-trim ke bounding box isinya, jadi
+tidak perlu penyesuaian per tema di CSS.
 
-Perbaikannya menaikkan luminansi HSL piksel jenuh sampai ambang `MIN_L`,
-dengan Hue dan Saturation tetap utuh, jadi brand cyan tidak berubah jadi abu-abu.
-Piksel jenuh saja yang kena; kalau semua piksel dinaikkan, accent
-`rgb(32,32,32)` ikut jadi abu-abu terang dan muncul bercak di sekeliling huruf.
-
-### Dua syarat yang berlawanan arah
-
-Menaikkan cyanaja tidak cukup, karena logo punya elemen putih tersendiri di
-tengah wordmark (kolom ke-4Sekitar 97% putih di keempat baris), bukan sekadar
-highlight tipis di dalam huruf. Jadi ada dua syarat yang harus terpenuhi
-sekaligus:
-
-- cyan harus terbaca di latar gelap (kontras eksternal)
-- bentuk putih harus tetap terpisah dari cyan (kontras internal)
-
-Arahnya berlawanan: lift terlalu besar membuat putih dan cyan berdekatan.
-
-| MIN_L | cyan/latar | putih/cyan | cyan jadi |
-| --- | --- | --- | --- |
-| (tanpa lift) | 2,2:1 | 5,1:1 | `rgb(0,96,256)` |
-| 0,58 | 4,96:1 | 3,98:1 | `rgb(52,126,243)` |
-| 0,65 | 4,95:1 | 3,08:1 | `rgb(86,147,245)` |
-| 0,72 | 8,17:1 | 2,40:1 | `rgb(128,160,256)` |
-
-Jadi `0,65` dipilih: kontras internalnya masih di atas 3:1, sementara 92,6%
-piksel huruf sudah di atas 3:1 terhadap latar. Di 0,72 bentuk putih akan
-menyatu dengan cyan pada 30px.
-
-Pengukuran dilakukan pada **ukuran render footer yang sebenarnya** (105x30,
-hanya piksel inti `alpha>=128`, opacity 0,70), bukan pada file 512x146.
-Downscaling 4,9x itu sendiri mengubah kontras, jadi angka pada file asli akan
-terlalu optimistis.
-
-### Opacity per tema
-
-| | Header | Footer |
-| --- | --- | --- |
-| Tema terang | 1 | 0,85 + `grayscale(0.25)` |
-| Tema gelap | 1 | 0,70 |
-
-Nilai tidak simetris itu disengaja. Varian gelap sudah lebih terang setelah lift,
-jadi tidak perlu opacity separuh seperti varian terang yang warnanya memang
-gelap. Yang penting: di footer gelap, hanya 3,3% piksel huruf yang berada di
-rentang lemah (1,5-3:1).
-
-Sisa sekitar 3% piksel yang tetap di bawah 1,5:1 adalah accent `rgb(32,32,32)`.
-Di sumber aslinya accent itu juga tidak terlihat di atas `rgb(25,25,25)`, jadi
-bukan bagian dari desain yang dirasakan.
-
-### Membuild ulang
-
-Kedua perintah ini membaca berkas sumber dari folder `src/`, yang **di-ignore
-git** supaya repo tetap ringan. Setiap orang menaruh berkas kerja sendiri di sana:
-
-```
-src/Logo Hoshiva.png     -> varian terang
-src/logo terang.png      -> varian gelap
-```
-
-Sumber bisa ditimpa lewat argumen pertama atau env `HOSHIVA_LOGO_SRC`:
-
-```bash
-npm run logo                                   # dari src/
-npm run logo:dark                              # dari src/, lift luminansi ikut diterapkan
-node scripts/logo-theme.js path/ke/logo.png    # dari berkas lain
-HOSHIVA_LOGO_SRC=path/ke/logo.png npm run logo:dark
-```
-
-Hasil build deterministik: berkas yang sama menghasilkan hash PNG yang sama,
-sehingga `git diff` tidak bersporak karena encoding ulang.
-
-Folder `src/` tidak perlu ikut ada untuk menjalankan aplikasinya. Yang dilayani
-server hanya `public/`, jadi `src/` tidak pernah terekspos lewat HTTP.
-
+---
 
 ## Keamanan
 
@@ -373,13 +309,25 @@ server hanya `public/`, jadi `src/` tidak pernah terekspos lewat HTTP.
 ## Test
 
 ```bash
-npm test          # unit: SSRF, taksonomi, pipeline gambar, cache, filter rasio
+npm test          # unit: SSRF, taksonomi, rem kategori, pipeline gambar, cache, filter rasio
 npm start         # terminal lain
 npm run test:api  # endpoint (butuh server hidup)
 ```
 
 Test unit tidak butuh jaringan maupun server, dan tidak menyentuh data asli
-(cache dan taksonomi ditulis ke direktori sementara).
+(cache dan taksonomi ditulis ke direktori sementara lewat `HOSHIVA_CACHE_DIR`
+dan `HOSHIVA_TAXONOMY_FILE`).
+
+Untuk menyorot satu bagian:
+
+```bash
+npm run test:ssrf      # guard SSRF
+npm run test:taxonomy  # aturan kategori otomatis
+npm run test:budget    # rem kategori: ambang, cap, decay, delay
+npm run test:image     # pipeline resize/upscale
+npm run test:cache     # cache memori + disk
+npm run test:ratio     # filter orientasi/rasio
+```
 
 Filter rasio diuji dua lapis: aturan batasnya di `scripts/test-ratio.js`
 (offline, menguji `matchesRatio`), lalu dari sisi API untuk memastikan hasil
