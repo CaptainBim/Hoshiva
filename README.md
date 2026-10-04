@@ -5,7 +5,7 @@ permintaan ke sumber gambar (Wallhaven + Safebooru), menyediakannya dengan
 ukuran yang tepat untuk layarmu, dan mendukung upscale dengan gaya waifu2x.
 
 <p align="center">
-  <img src="public/assets/logo.png" alt="Hoshiva" width="420">
+  <img src="public/assets/logo-dark.png" alt="Hoshiva" width="420">
 </p>
 
 ---
@@ -263,6 +263,8 @@ supaya tidak ada request tambahan dan tidak ada kedipan saat tema berganti.
 | --- | --- | --- |
 | Header | `logo.png` (1232x352) | `logo-dark.png` (1713x488) |
 | Footer | `logo-512.png` (512x146) | `logo-dark-512.png` (512x146) |
+
+README memakai varian gelap (`logo-dark.png`).
 
 Perhatikan tinggi header berbeda antara varian: logo terang lebih rapat, logo
 gelap lebih longgar. Keduanya sudah di-trim ke bounding box isinya, jadi tidak
