@@ -1,19 +1,27 @@
 # dependencies
 node_modules/
 
-# runtime state (cache TTL + auto taxonomy; dibuat ulang otomatis)
-data/cache/
-data/taxonomy.json
+# runtime state
+# SELURUH isi data/ adalah state runtime, jadi abaikan foldernya, bukan
+# per-file. Sebelumnya hanya data/cache/ dan data/taxonomy.json yang disebut,
+# sehingga backup seperti data/taxonomy.backup-before-cap.json tetap ikut
+# ter-commit. Server membuat foldernya sendiri saat boot
+# (categories.js mkdirSync DATA_DIR, cache.js mkdirSync CACHE_DIR),
+# jadi mengabaikan seluruh data/ tidak merusak repo baru.
+data/
+
+# sumber logo (berkas kerja, bukan aset yang disajikan lewat HTTP)
+# Isi folder ini tidak di-commit demi menjaga repo tetap ringan.
+src/
 
 # env
 .env
-.env.local
+.env.*
+!.env.example
 
 # logs & OS junk
 *.log
 *.err
-server.log
-server.err
 npm-debug.log*
 Thumbs.db
 .DS_Store

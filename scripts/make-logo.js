@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-const SRC = process.argv[2] || 'C:/Users/Pongo/Downloads/Logo Hoshiva.png';
+const SRC = process.argv[2] || process.env.HOSHIVA_LOGO_SRC || path.join(ROOT, 'src', 'Logo Hoshiva.png');
 const WORK = 720; // sisi maksimal untuk analisis
 const TOL = 42; // toleransi kemiripan warna dengan background (0-255)
 const MIN_ALPHA = 26; // alpha minimum agar tepi tidak revoke

@@ -1,10 +1,12 @@
 /**
  * Bangun logo varian TEMA GELAP dari file sumber berlatar solid.
  *
- * Dipakai untuk "C:\Users\Pongo\Downloads\logo terang.png" yang shipped
- * sebagai kanvas 2000x2002 dengan latar near-black, sementara yang dipakai di
- * header adalah wordmark lebar 3.45:1.
+ * Sumbernya ada di src/logo terang.png. Folder src/ di-ignore git supaya
+ * repo tetap ringan; setiap orang menaruh berkas kerja sendiri di sana.
+ * Aslinya kanvas 2000x2000 dengan latar near-black, sementara yang dipakai
+ * di header adalah wordmark lebar 3.51:1.
  *
+ * Sumber bisa ditimpa lewat argumen pertama atau env HOSHIVA_LOGO_SRC.
  * Cara kerja (prinsip sama dengan scripts/make-logo.js):
  *   1. Sample warna latar dari 4 sudut.
  *   2. Flood-fill BFS dari 4 sudut -> hanya latar yang TERHUBUNG tepi yang
@@ -24,7 +26,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'public', 'assets');
 
-const SRC = process.argv[2] || 'C:/Users/Pongo/Downloads/logo terang.png';
+const SRC = process.argv[2] || process.env.HOSHIVA_LOGO_SRC || path.join(ROOT, 'src', 'logo terang.png');
 const TOL = 8; // toleransi kemiripan warna dengan latar (0-255)
 const MIN_ALPHA = 26; // alpha minimum di tepi agar garis letter tak hilang
 
@@ -40,16 +42,16 @@ const MIN_ALPHA = 26; // alpha minimum di tepi agar garis letter tak hilang
  * kontras yang memakai pixel putih terlihat bagus, padahal 59% logo
  * (cyan) lenyap di latar hampir hitam.
  *
- * Yang dipakai di sini adalah HSL lightness, bukan luminansi WCAG.
- * Keduanya jauh berbeda untuk warna jenuh: cyan rgb(0,96,256) punya HSL
- * L=0,50 tapi luminansi WCAG hanya 0,156, karena biru hanya menyumbang
- * 0,0722. Menilai dengan HSL L saja akan salah.
+ * Yang dipakai di sini adalah HSL lightness, bukan luminansi WCAG. Keduanya
+ * jauh berbeda untuk warna jenuh: cyan rgb(0,96,256) punya HSL L=0,50 tapi
+ * luminansi WCAG hanya 0,156, karena biru hanya menyumbang 0,0722.
+ * Menilai dengan HSL L saja akan salah.
  *
  * Lift hanya kena piksel jenuh; Hue dan Saturation tetap utuh. Kalau semua
  * piksel dinaikkan, accent rgb(32,32,32) ikut jadi abu-abu terang dan
  * muncul bercak di sekeliling huruf.
  *
- * Kenapa 0,58 dan bukan lebih tinggi. Ada dua syarat yang harus terpenuhi
+ * Kenapa 0,65 dan bukan lebih tinggi. Ada dua syarat yang harus terpenuhi
  * bersamaan, dan keduanya berlawanan arah:
  *
  *   - cyan harus terbaca di latar gelap            (kontras eksternal)
@@ -58,23 +60,36 @@ const MIN_ALPHA = 26; // alpha minimum di tepi agar garis letter tak hilang
  * Peta spasial logo menunjukkan kolom ke-4 sekitar 97% putih di keempat
  * baris, jadi putih itu elemen tersendiri di tengah wordmark, bukan
  * highlight tipis di dalam huruf. Menaikkan cyan terlalu jauh membuat
- * putih dan cyan berdekatan. Diukur di atas rgb(8,8,15):
+ * putih dan cyan berdekatan.
  *
- *   MIN_L   cyan/latar   putih/cyan   warna cyan jadi
- *   (asis)     2.2:1        5.1:1      rgb(0,96,256)
- *   0,58       3.9:1        3.9:1      rgb(52,126,243)
- *   0,65       4.6:1        3.0:1      rgb(86,147,245)
- *   0,72       5.9:1        2.5:1      rgb(128,160,256)
+ * Angka di bawah diukur pada aset yang benar-benar di-deploy, bukan pada
+ * tebakan. Dua metrik, dua kondisi ukur:
  *
- * 0,58 adalah titik di mana kedua syarat sama-sama di atas 3:1. Cyan di
- * 0,72 memang lebih terang, tapi putihnya ikut mendekati sian dan logo
- * terlihat mushy pada 30px.
+ *   - cyan/latar dan sebaran kontras: ukuran render footer yang sebenarnya,
+ *     105x30, hanya piksel inti alpha>=128, opacity 0,70, latar rgb(8,8,15).
+ *     Downscaling 4,9x itu sendiri mengubah kontras, jadi angka pada file
+ *     512x146 akan terlalu optimistis.
+ *   - putih/cyan (kontras internal): resolusi native, karena downscale tidak
+ *     boleh ikut Responsibilities dalam penilaian batas antar-warna.
+ *
+ *   MIN_L   cyan/latar   >= 3:1   >= 4,5:1   putih/cyan   cyan jadi
+ *   (asis)     2.2:1      -          -          5.1:1     rgb(0,96,256)
+ *   0,58       4.96:1   92.6%       28%         3.98:1     rgb(52,126,243)
+ *   0,65       4.95:1   92.6%       27%         3.08:1     rgb(86,147,245)
+ *
+ * 0,65 dipilih karena kontras internalnya 3,08:1 masih di atas 3:1, jadi
+ * bentuk putih tidak menyatu dengan sian pada 30px. Nilai 0,72 ke atas
+ * ditolak: putih/cyan turun ke sekitar 2,4:1 atau kurang.
+ *
+ * Sisa sekitar 3% piksel yang tetap di bawah 1,5:1 adalah accent
+ * rgb(32,32,32). Di sumber aslinya accent itu juga tidak terlihat di atas
+ * rgb(25,25,25), jadi bukan bagian dari desain yang dirasakan.
  *
  * Sisa sekitar 3% yang tetap tak terlihat adalah accent rgb(32,32,32).
  * Di sumber aslinya itu juga tak terlihat di atas rgb(25,25,25), jadi
  * bukan bagian dari desain yang dirasakan.
  */
-const MIN_L = 0.58;
+const MIN_L = 0.65;
 const MIN_SAT = 0.15;
 
 /* ------------------------------ warna ------------------------------ */

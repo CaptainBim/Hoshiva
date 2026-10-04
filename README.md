@@ -4,7 +4,9 @@ Mesin pencari wallpaper modern. Backend Node/Express memproxyl semua
 permintaan ke sumber gambar (Wallhaven + Safebooru), menyediakannya dengan
 ukuran yang tepat untuk layarmu, dan mendukung upscale dengan gaya waifu2x.
 
-![Hoshiva](logo-terang.png)
+<p align="center">
+  <img src="public/assets/logo.png" alt="Hoshiva" width="420">
+</p>
 
 ---
 
@@ -185,6 +187,173 @@ GET /api/img?url=<src>&cx=0.1&cy=0.1&cw=0.8&ch=0.8&w=1920&h=1080&mode=cover&down
 ```
 
 ---
+
+## Anggaran kategori
+
+Kategori otomatis bertambah sendiri setiap kali ada wallpaper baru masuk, jadi
+tanpa rem pun ia tumbuh tanpa batas. Empat rem berjalan bersamaan; semuanya
+ada di `server/categories.js` pada blok `budgets`.
+
+| Rem | Nilai | Yang dicegah |
+| --- | --- | --- |
+| Ambang promote | `PROMO_MIN_ENTITY` 5, `PROMO_MIN_PLAIN` 22 | entity dengan 5 hit, kata umum dengan 22 hit |
+| Cap | `MAX_AUTO_CATS` 400 | pertumbuhan tanpa batas |
+| Decay | `STALE_AFTER` 30 hari, `STALE_MIN_HITS` 12 | kategori lama yang tidak relevan lagi |
+| Delay | `CAP_CHECK_MS` 5 menit, `STALE_CHECK_MS` 6 jam | penyapuan setiap kali ingest |
+
+**Cap adalah filter kualitas, bukan kuota.** Saat sudah di 400, kategori baru
+hanya boleh naik kalau hit-nya melampaui kategori otomatis terlemah yang ada.
+Jadi cap tidak memangkas membuta tuli, dan kategori yang tidak pernah tersentuh
+tidak tiba-tiba tergantikan.
+
+**Decay** menyapu kategori yang sudah lebih tua dari 30 hari dan hit-nya di
+bawah 12, maksimal 120 per sapuan. Tag yang tersingkir karena usang atau cap
+menghitung ulang dari 0, supaya tidak langsung naik lagi di ingest berikutnya
+lalu turun lagi beruntun. Tag yang tersingkir karena melanggar aturan tidak
+direset, karena `canPromote` sudah menolaknya.
+
+**Delay** menjaga agar sapuan tidak jalan di setiap request. Penjadwalan
+dilakukan dari `ingest()` dan sekali saat boot.
+
+### Tag dummy
+
+Sumber booru mengirim banyak tag metadata yang bukan kategori: `Character Name`,
+`Artist Name`, `Digital Media`. Semuanya disaring dengan pencocokan **persis**
+lewat set `DUMMY_TAGS`, bukan regex.
+
+Regex untuk kata seperti `character` atau `artist` sengaja tidak dipakai:
+suffix `(character)`, `(series)`, `(artist)`, dan `(creature)` di Danbooru
+adalah penanda legitimasi, bukan metadata. Memblokirnya secara wildcard ikut
+mematikan entity asli, termasuk `Idolmaster Million Live! Theater Days` (869 hit).
+
+`DUMMY_TAGS` juga dipakai `isUsefulTag`, bukan hanya `canPromote`, supaya
+placeholder ini tidak muncul di panel trending.
+
+### Kata umum
+
+Tag generik seperti `standing`, `hair`, `sweater`, `apron`, atau `mask` tidak
+pernah dipromosikan. Daftar lengkapnya ada di `GENERIC_ATTR`
+(`server/categories.js`).
+
+Kata waktu seperti `day` dan `days` ada di set terpisah `SCENE_TIME_EXACT`,
+yang hanya menolak tag tersebut kalau seluruh tag persis sama. Jadi `day`
+ditolak, tapi `Theater Days` tetap boleh.
+
+### Dampak
+
+| | Sebelum | Sesudah |
+| --- | --- | --- |
+| Kategori otomatis | 758 | 400 |
+| Total kategori | 770 | 412 |
+| Payload taksonomi | 69,3 KB | 41,9 KB |
+
+Kontraksi 40% itu gratis: bukan karena kategori dibuang membuta tuli, tapi
+karena 61% kategori sebelumnya adalah noise (439 dari 726 punya 12 hit atau
+kurang, didominasi tag dummy).
+
+---
+
+## Logo
+
+Logo tersedia dalam dua varian, dipilih lewat `data-theme` pada elemen `<html>`.
+Markup-nya memakai dua `<img>` dengan kontras pertukaran, bukan `background-image`,
+supaya tidak ada request tambahan dan tidak ada kedipan saat tema berganti.
+
+| Slot | Tema terang | Tema gelap |
+| --- | --- | --- |
+| Header | `logo.png` (1232x352) | `logo-dark.png` (1713x488) |
+| Footer | `logo-512.png` (512x146) | `logo-dark-512.png` (512x146) |
+
+Perhatikan tinggi header berbeda antara varian: logo terang lebih rapat, logo
+gelap lebih longgar. Keduanya sudah di-trim ke bounding box isinya, jadi tidak
+perlu adjusting per tema di CSS.
+
+### Kenapa logo gelap perlu lift luminansi
+
+Varian gelap dibangun dari sumber berlatar solid (`logo terang.png`, kanvas
+2000x2000). Script aslinya hanya membuang latar dengan flood-fill; semua warna
+di dalam huruf ikut terbawa apa adanya. Padahal isi logo itu **cyan gelap**
+`rgb(0,96,256)` yang hanya reads 3,9:1 di atas `rgb(8,8,15)`, dan di footer
+yang opacity-nya dikurangi cyan itu efektif tinggal 2,2:1.
+
+Gejalanya mudah terlewat: 24% piksel logo berwarna putih tetap terang, jadi
+pengukuran kontras yang mengambil piksel putih terlihat bagus (8,59:1) padahal
+59% logo, yaitu bagian cyan, lenyap di latar hampir hitam.
+
+Perbaikannya menaikkan luminansi HSL piksel jenuh sampai ambang `MIN_L`,
+dengan Hue dan Saturation tetap utuh, jadi brand cyan tidak berubah jadi abu-abu.
+Piksel jenuh saja yang kena; kalau semua piksel dinaikkan, accent
+`rgb(32,32,32)` ikut jadi abu-abu terang dan muncul bercak di sekeliling huruf.
+
+### Dua syarat yang berlawanan arah
+
+Menaikkan cyanaja tidak cukup, karena logo punya elemen putih tersendiri di
+tengah wordmark (kolom ke-4Sekitar 97% putih di keempat baris), bukan sekadar
+highlight tipis di dalam huruf. Jadi ada dua syarat yang harus terpenuhi
+sekaligus:
+
+- cyan harus terbaca di latar gelap (kontras eksternal)
+- bentuk putih harus tetap terpisah dari cyan (kontras internal)
+
+Arahnya berlawanan: lift terlalu besar membuat putih dan cyan berdekatan.
+
+| MIN_L | cyan/latar | putih/cyan | cyan jadi |
+| --- | --- | --- | --- |
+| (tanpa lift) | 2,2:1 | 5,1:1 | `rgb(0,96,256)` |
+| 0,58 | 4,96:1 | 3,98:1 | `rgb(52,126,243)` |
+| 0,65 | 4,95:1 | 3,08:1 | `rgb(86,147,245)` |
+| 0,72 | 8,17:1 | 2,40:1 | `rgb(128,160,256)` |
+
+Jadi `0,65` dipilih: kontras internalnya masih di atas 3:1, sementara 92,6%
+piksel huruf sudah di atas 3:1 terhadap latar. Di 0,72 bentuk putih akan
+menyatu dengan cyan pada 30px.
+
+Pengukuran dilakukan pada **ukuran render footer yang sebenarnya** (105x30,
+hanya piksel inti `alpha>=128`, opacity 0,70), bukan pada file 512x146.
+Downscaling 4,9x itu sendiri mengubah kontras, jadi angka pada file asli akan
+terlalu optimistis.
+
+### Opacity per tema
+
+| | Header | Footer |
+| --- | --- | --- |
+| Tema terang | 1 | 0,85 + `grayscale(0.25)` |
+| Tema gelap | 1 | 0,70 |
+
+Nilai tidak simetris itu disengaja. Varian gelap sudah lebih terang setelah lift,
+jadi tidak perlu opacity separuh seperti varian terang yang warnanya memang
+gelap. Yang penting: di footer gelap, hanya 3,3% piksel huruf yang berada di
+rentang lemah (1,5-3:1).
+
+Sisa sekitar 3% piksel yang tetap di bawah 1,5:1 adalah accent `rgb(32,32,32)`.
+Di sumber aslinya accent itu juga tidak terlihat di atas `rgb(25,25,25)`, jadi
+bukan bagian dari desain yang dirasakan.
+
+### Membuild ulang
+
+Kedua perintah ini membaca berkas sumber dari folder `src/`, yang **di-ignore
+git** supaya repo tetap ringan. Setiap orang menaruh berkas kerja sendiri di sana:
+
+```
+src/Logo Hoshiva.png     -> varian terang
+src/logo terang.png      -> varian gelap
+```
+
+Sumber bisa ditimpa lewat argumen pertama atau env `HOSHIVA_LOGO_SRC`:
+
+```bash
+npm run logo                                   # dari src/
+npm run logo:dark                              # dari src/, lift luminansi ikut diterapkan
+node scripts/logo-theme.js path/ke/logo.png    # dari berkas lain
+HOSHIVA_LOGO_SRC=path/ke/logo.png npm run logo:dark
+```
+
+Hasil build deterministik: berkas yang sama menghasilkan hash PNG yang sama,
+sehingga `git diff` tidak bersporak karena encoding ulang.
+
+Folder `src/` tidak perlu ikut ada untuk menjalankan aplikasinya. Yang dilayani
+server hanya `public/`, jadi `src/` tidak pernah terekspos lewat HTTP.
+
 
 ## Keamanan
 

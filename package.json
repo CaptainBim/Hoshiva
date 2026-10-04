@@ -12,7 +12,7 @@
     "test": "node scripts/test-unit.js",
     "test:ssrf": "node scripts/test-ssrf.js",
     "test:taxonomy": "node scripts/test-taxonomy.js",
-      "test:budget": "node scripts/test-budget.js",
+    "test:budget": "node scripts/test-budget.js",
     "test:image": "node scripts/test-image.js",
     "test:cache": "node scripts/test-cache.js",
     "test:ratio": "node scripts/test-ratio.js",
