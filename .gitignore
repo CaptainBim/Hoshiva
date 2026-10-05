@@ -2,16 +2,9 @@
 node_modules/
 
 # runtime state
-# SELURUH isi data/ adalah state runtime, jadi abaikan foldernya, bukan
-# per-file. Sebelumnya hanya data/cache/ dan data/taxonomy.json yang disebut,
-# sehingga backup seperti data/taxonomy.backup-before-cap.json tetap ikut
-# ter-commit. Server membuat foldernya sendiri saat boot
-# (categories.js mkdirSync DATA_DIR, cache.js mkdirSync CACHE_DIR),
-# jadi mengabaikan seluruh data/ tidak merusak repo baru.
 data/
 
-# sumber logo (berkas kerja, bukan aset yang disajikan lewat HTTP)
-# Isi folder ini tidak di-commit demi menjaga repo tetap ringan.
+# sumber logo
 src/
 
 # env
@@ -20,16 +13,6 @@ src/
 !.env.example
 
 # Railway
-# railway.json (Config as Code) ikut ter-commit: isinya hanya builder, start
-# command, healthcheck, dan restart policy. Tidak ada credential di dalamnya.
-#
-# .railway/ Mostly berisi state lokal CLI yang menunjuk ke project dan
-# environment spesifik, jadi jangan ikut ter-commit. Kalau nanti repo ini
-# pindah ke Infrastructure as Code, railway.ts WAJIB ikut ter-commit supaya
-# Railway bisa membacanya, jadi file itu dikecualikan. Perhatikan bahwa
-# `railway config migrate` menamai service dari nama folder, bukan nama
-# service sebenarnya, dan plan-nya bisa Removesumber repo GitHub sehingga
-# deploy otomatis mati - periksa `railway config plan` sebelum apply.
 .railway/*
 !.railway/railway.ts
 
