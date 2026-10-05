@@ -7,14 +7,6 @@ import {
   UA, FETCH_TIMEOUT, MAX_OUTPUT_PX, CROP_POSITIONS, DEFAULT_CROP_POSITION,
 } from './config.js';
 
-/* ------------------------------------------------------------------ *
- * Image pipeline Hoshiva
- *  - proxy gambar (menghindari CORS + hotlink blok)
- *  - resize ke ukuran wallpaper pilihan
- *  - UPSCALE: emulasi waifu2x (denoise + lanczos3 + unsharp),
- *    atau panggil binary waifu2x asli bila terpasang.
- * ------------------------------------------------------------------ */
-
 /**
  * Guard SSRF.
  *
@@ -44,7 +36,6 @@ function parseIp(host) {
     const parts = raw.map(toInt);
     if (parts.some((v) => !Number.isInteger(v))) return null;
     const last = parts[parts.length - 1];
-    // Part terakhir boleh melebihi 255 karena menyerap sisa byte; sisanya <= 255.
     if (parts.slice(0, -1).some((v) => v > 255)) return null;
     if (last >= 256 ** (5 - raw.length)) return null;
     const full = [...new Array(4 - raw.length).fill(0), ...parts];
@@ -156,10 +147,6 @@ export async function download(url, { maxBytes = 40 * 1024 * 1024, timeout = FET
   }
 }
 
-/**
- * Cari binary waifu2x. Path dari env selalu dicek; nama perintah di PATH
- * diverifikasi benar-benar ada supaya laporan status tidak berbohong.
- */
 let waifu2xBin;
 const CANDIDATES = [
   process.env.WAIFU2X_PATH,
@@ -213,12 +200,6 @@ function runWaifu2x(bin, inFile, outFile, scale) {
   });
 }
 
-/**
- * Profil penajaman, dari yang paling ringan ke paling tegas untuk garis anime:
- *  - none  : resize Lanczos3 biasa
- *  - waifu2x: denoise median lalu crisp (pendekatan gaya waifu2x)
- *  - anime : penajaman agresif, garis paling tegas
- */
 const PROFILES = {
   none: null,
   waifu2x: { denoise: 3, sharpen: { sigma: 1.1, m1: 0.7, m2: 1.6, x1: 2, y2: 10, y3: 18 } },
@@ -238,18 +219,10 @@ const clampDim = (n) => {
   return Math.min(v, MAX_OUTPUT_PX);
 };
 
-/**
- * Luas crop minimum sebagai fraksi dari tiap sisi gambar.
- *
- * Crop 100x100 dari wallpaper 4000px Technically "valid" bagi sharp, tapi
- * hasilnya bukan wallpaper — hanya thumbnail. Karena itu area terlalu kecil
- * ditolak dengan 400, bukan diam-diam menghasilkan gambar kecil.
- */
 export const MIN_CROP_FRAC = 0.15;
 
 export const MIN_CROP_PX = 320;
 
-/** Pecahan 0..1; kembalikan null bila bukan angka. */
 const asFrac = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.min(Math.max(n, 0), 1) : null;
@@ -295,46 +268,22 @@ export function resolveCrop(meta, crop) {
   return { left, top, width, height };
 }
 
-/**
- * Posisi crop untuk mode `cover`, dibatasi ke daftar yang dipahami sharp.
- * Nilai di luar daftar (termasuk string dari klien yang nakal) jatuh ke default,
- * bukan diteruskan mentah ke sharp.
- */
 function cropPosition(pos) {
   return CROP_POSITIONS.includes(pos) ? pos : DEFAULT_CROP_POSITION;
 }
 
-/**
- * Nilai geser 0..100, atau null kalau tidak diberikan.
- * 50 = tengah, 0 = sisi kiri/atas, 100 = sisi kanan/bawah.
- */
 export function panValue(p) {
   if (p === undefined || p === null || p === '') return null;
   const n = Number(p);
   return Number.isFinite(n) ? Math.min(Math.max(n, 0), 100) : null;
 }
 
-/**
- * Region `cover` untuk geser `pan`, dalam piksel. Null kalau tidak ada yang
- * perlu dipotong.
- *
- * Sumbu yang dipotong ditentukan perbandingan rasio: sumber lebih lebar dari
- * target berarti sisi kiri/kanan yang dibuang, dan sebaliknya. `pan` bergerak
- * di sumbu itu saja. Menggeser sumbu yang tidak dipotong tidak mengubah apa
- * pun, jadi slider-nya akan terlihat tidak berfungsi.
- *
- * sharp hanya menerima posisi bernama atau gravity bulat (0..3600), bukan
- * offset pecahan, jadi regionnya dihitung di sini lalu diberikan lewat
- * `extract()`.
- */
 export function coverRegion(srcW, srcH, w, h, pan) {
   if (!srcW || !srcH || !w || !h) return null;
-  // -1 = seluruh ruang ke kiri/atas, 0 = tengah, 1 = ke kanan/bawah.
   const t = (pan - 50) / 50;
   const shift = (room) => Math.round(room * (0.5 + t / 2));
   let left, top, width, height;
   if (srcW * h > srcH * w) {
-    // Sumber lebih lebar: buang kiri/kanan.
     width = Math.max(1, Math.min(srcW, Math.round((srcH * w) / h)));
     const room = srcW - width;
     if (room <= 0) return null; // rasio sudah cocok, tidak ada yang bisa digeser
@@ -342,7 +291,6 @@ export function coverRegion(srcW, srcH, w, h, pan) {
     top = 0;
     left = shift(room);
   } else {
-    // Sumber lebih tinggi: buang atas/bawah.
     height = Math.max(1, Math.min(srcH, Math.round((srcW * h) / w)));
     const room = srcH - height;
     if (room <= 0) return null;
@@ -350,7 +298,6 @@ export function coverRegion(srcW, srcH, w, h, pan) {
     left = 0;
     top = shift(room);
   }
-  // Pembulatan bisa menyinggung tepi; jepit agar extract() tidak keluar gambar.
   left = Math.min(Math.max(left, 0), srcW - width);
   top = Math.min(Math.max(top, 0), srcH - height);
   return { left, top, width, height };
@@ -371,14 +318,10 @@ export function coverRegion(srcW, srcH, w, h, pan) {
 export async function transform(buffer, opt = {}) {
   const meta = await sharp(buffer).metadata();
   const crop = resolveCrop(meta, opt.crop);
-  // Kalau sudah dicrop, "ukuran asal" untuk keperluan upscale adalah area crop.
   const srcW = crop ? crop.width : meta.width || 0;
   const srcH = crop ? crop.height : meta.height || 0;
   const mode = opt.mode || 'contain';
 
-  // `upscale=auto`: naikkan kualitas hanya kalau target memang lebih besar
-  // dari sumber. Kalau tidak, resize biasa saja — tidak ada gunanya
-  // menajamkan gambar yang hanya diperkecil.
   let profile;
   if (opt.upscale === 'auto') {
     const tw = clampDim(opt.w);
@@ -392,15 +335,11 @@ export async function transform(buffer, opt = {}) {
   const w = clampDim(opt.w);
   const h = clampDim(opt.h);
   let resize = null;
-  // Region geser manual untuk mode cover. Diperlukan di luar cabang resize
-  // supaya bisa diteruskan ke extract() di bawah.
   let region = null;
 
   if (mode === 'raw') {
     resize = null; // unduh apa adanya
   } else if (!w && !h) {
-    // Tanpa target: kalau diminta upscale, perbesar sebesar faktor `scale`
-    // (meniru semantik waifu2x). Tanpa itu, kirim ulang resolusi asli.
     const factor = Math.min(Math.max(Number(opt.scale) || 0, 0), 8);
     if (profile && factor > 1 && srcW && srcH) {
       resize = { width: clampDim(srcW * factor), height: clampDim(srcH * factor), kernel: 'lanczos3' };
@@ -409,8 +348,6 @@ export async function transform(buffer, opt = {}) {
     const pan = mode === 'cover' ? panValue(opt.pan) : null;
     region = pan === null ? null : coverRegion(srcW, srcH, w, h, pan);
     resize = region
-      // Region sudah persis rasio target, jadi resize di bawah tidak
-      // perlu memotong apa pun dan `position` tidak relevan lagi.
       ? { width: w, height: h, fit: 'cover', kernel: 'lanczos3' }
       : mode === 'cover'
         ? { width: w, height: h, fit: 'cover', position: cropPosition(opt.pos), kernel: 'lanczos3' }
@@ -420,10 +357,8 @@ export async function transform(buffer, opt = {}) {
               : { height: h, kernel: 'lanczos3' })
           : { width: w, height: h, fit: 'contain', background: { r: 12, g: 13, b: 20, alpha: 1 }, kernel: 'lanczos3' };
   } else if (w) {
-    // Hanya lebar: kunci lebar, tinggi mengikuti aspect ratio.
     resize = { width: w, kernel: 'lanczos3' };
   } else {
-    // Hanya tinggi.
     resize = { height: h, kernel: 'lanczos3' };
   }
 
@@ -460,15 +395,9 @@ export async function transform(buffer, opt = {}) {
   };
 }
 
-/** Render lengkap: download -> (opsional waifu2x asli) -> transform. */
 export async function render(url, opt = {}) {
-  // Mode 'auto' hanya boils down ke sharpen; binary waifu2x tidak dipakai
-  // supaya hasilnya konsisten dengan fallback yang dipakai server.
   const wantsRealW2x = opt.upscale && opt.upscale !== 'none' && opt.upscale !== 'auto';
 
-  // Coba binary waifu2x asli dulu bila diminta dan tersedia.
-  // Lewati bila ada crop: crop hanya bisa di sharp, dan early-return di bawah
-  // akan mengembalikan gambar mentah tanpa crop.
   if (wantsRealW2x && !opt.crop && waifu2xAvailable()) {
     try {
       const { buffer } = await download(url);

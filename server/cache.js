@@ -3,10 +3,6 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { CACHE_DIR } from './config.js';
 
-/**
- * Cache 2-lapis: memori (Map LRU) + disk (TTL).
- * Sumber API anime sering rate-limit, jadi cache sangat vital.
- */
 const mem = new Map();
 const MEM_MAX = 400;
 /** Di atas ambang ini, hasil hanya disimpan di memori (jangan tulis ke disk). */
@@ -55,10 +51,6 @@ function decode(value) {
   return value;
 }
 
-/**
- * Naikkan bila format serialisasi berubah. Record versi lama diperlakukan
- * sebagai cache miss lalu dihapus, jadi tidak ada payload basi yang terbaca.
- */
 const CACHE_VERSION = 2;
 
 function memGet(k) {
@@ -105,18 +97,13 @@ export function cacheSet(key, value, ttlSec = 600) {
   const rec = { v: CACHE_VERSION, value, expires: Date.now() + ttlSec * 1000, at: Date.now() };
   memSet(k, rec);
   try {
-    // Render 4K bisa jadi ratusan KB; base64 menambah 1.33x dan tiap URL punya
-    // beberapa varian. Lewati disk untuk payload besar supaya folder cache tidak
-    // tumbuh tanpa batas — cache memori tetap melayani request berikutnya.
     if (Buffer.byteLength(JSON.stringify(encode(value))) > DISK_MAX_BYTES) return;
     ensureDir();
     fs.writeFileSync(fileOf(k), JSON.stringify({ ...rec, value: encode(value) }));
   } catch {
-    /* cache penuh / tidak writable: memori saja cukup */
   }
 }
 
-/** Jalankan fn dengan cache (dedup in-flight agar tidak request paralel ganda). */
 const inflight = new Map();
 export async function cached(key, ttlSec, fn) {
   const hit = cacheGet(key);
@@ -134,7 +121,6 @@ export async function cached(key, ttlSec, fn) {
   return p;
 }
 
-/** Bersihkan file cache kedaluwarsa (dipanggil saat boot). */
 export function cacheSweep() {
   let removed = 0;
   let kept = 0;
@@ -159,16 +145,6 @@ export function cacheSweep() {
   return { removed, kept };
 }
 
-/**
- * Hitungan cache tanpa efek samping: TIDAK membaca isi file dan TIDAK
- * menghapus apa pun.
- *
- * Ini sengaja dipisah dari `cacheSweep` karena `/api/health` dipakai Railway
- * sebagai healthcheck dan dipanggil berkali-kali. Sweep di dalam probe akan
- * (a) menghapus file tiap kali Railway mem-ping, dan (b) memblokir event loop
- * karena read + parse setiap entri. Hitungan disk cukup dari nama file, dan
- * dimemoisasi sebentar supaya probe berdekatan tidak mengulang readdir.
- */
 let statsMemo = { at: 0, disk: 0 };
 export function cacheStats() {
   const now = Date.now();

@@ -2,23 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, SEED_CATEGORIES } from './config.js';
 
-/**
- * Taksonomi otomatis Hoshiva.
- *
- * Ide: setiap wallpaper yang masuk dari API "diumati" (ingest). Tag-nya
- * dicocokkan ke pola kategori yang sudah ada, dan tag yang belum dikenal
- * tapi sering muncul akan promoted menjadi kategori baru secara otomatis.
- * Semua counter dipersist ke disk supaya kategori terus belajar seiring
- * waktu tanpa perlu restart.
- */
-
-/**
- * Lokasi file taksonomi. `HOSHIVA_TAXONOMY_FILE` dipakai test agar ingest
- * sintetis tidak mencampuradukkan data pengguna yang sedang berjalan.
- */
 const FILE = process.env.HOSHIVA_TAXONOMY_FILE || path.join(DATA_DIR, 'taxonomy.json');
 
-/** Pola tag -> kategori. Semua lowercase, tanpa underscore. */
 const PATTERNS = {
   anime: ['anime', 'manga', 'anime_screenshot', 'adventurers', 'genre_fantasy'],
   girl: [
@@ -80,7 +65,6 @@ const GENERIC_ATTR = new RegExp(
   'looking_back|one_eye|two_eyes|bust|cropped|half_body|full_body|upper_body|lower_body|' +
   'bare|horn|horns|weapon|holding|hand|hands|arm|arms|leg|legs|foot|feet|finger|fingers|neck|back|' +
   'chest|cleavage|breast|breasts|thigh|thighs|calves|ankle|ankles|elbow|knees|topless|' +
-  // anatomi turunan: "tooth" -> "teeth", plus keluarga skeleton
   'teeth|tooth|fang|fangs|tongue|tusk|mane|skull|skeleton|humanoid|' +
   'standing|sitting|squatting|kneeling|leaning|crouching|posing|from_side|' +
   'tall|large|small|big|huge|tiny|square|rectangle|circular|horizontal|' +
@@ -91,11 +75,6 @@ const GENERIC_ATTR = new RegExp(
   'i'
 );
 
-/**
- * Noise: penanda kualitas/lokasi/sumber dan tag yang tidak pernah layak jadi
- * kategori. Dicocokkan sebagai kata utuh di mana pun dalam tag, sehingga
- * "english commentary" dan "women outdoors" ikut tertangkap.
- */
 const NOISE_TAGS = new RegExp(
   ('\\b(' +
   'outdoor|outdoors|indoor|indoors|inside|highres|lowres|absurdres|absurd_res|wallpaper|' +
@@ -129,21 +108,6 @@ const DUMMY_TAGS = new Set([
   'free wallpaper', 'no backstory', 'for wikia',
 ]);
 
-/**
-/**
- * Waktu & suasana - filter lapis kedua.
- * Tag-nya tetap berguna untuk panel trending, tapi tidak pernah layak jadi
- * kategori otomatis. Sebagian sudah tercakup seed PATTERNS ("night", "sunset",
- * "dusk", "twilight"), tapi saudara-saudaranya - "dawn", "evening" - akan bocor
- * jadi kategori otomatis begitu tag-nya sering muncul.
- * Dicek di canPromote(), bukan isUsefulTag().
- *
- * "day" dan "days" sengaja TIDAK ada di sini. Keduanya substring yang terlalu
- * berbahaya: "Theater Days", "Summer Days", "Blue Days" semuanya nama series.
- * Memblokirnya sebagai substring membuat entitas sebesar
- * "Idolmaster Million Live! Theater Days" (869 hit) ikut terbuang. Karena itu
- * keduanya ditangani terpisah oleh SCENE_TIME_EXACT di bawah.
- */
 const SCENE_TIME = new RegExp(
   ('\\b(' +
   'daytime|daylight|daytime sky|dawn|daybreak|morning|afternoon|' +
@@ -163,24 +127,12 @@ const SCENE_TIME = new RegExp(
  */
 const SCENE_TIME_EXACT = new Set(['day', 'days']);
 
-/** Tag berawalan angka: "1girl", "2boys" — jumlah orang, bukan identitas. */
 const NUMBER_PREFIX = /^\d+\s*(girls?|boys?|females?|males?|other)\b/;
 
-/** Entitas (karakter / series) — layak jadi kategori otomatis. */
 const ENTITY_HINT = /\([^)]+\)|!$|series|project|gakuen|shoujo|shounen|clannad|genshin|hololive|idolmaster|love_ru|touhou|kancolle|blue_archive|arknights|azur_lane/gi;
 
-/**
- * Tag yang sudah tercakup oleh kategori seed (PATTERNS di atas). Dipromosikan
- * sebagai kategori auto hanya akan menghasilkan duplikat — "Landscape" punya
- * seed sendiri, sehingga muncul dua kali di sidebar.
- */
 const SEED_TAGS = new Set(Object.values(PATTERNS).flat());
 
-/**
- * Sama seperti SEED_TAGS, tapi sudah dinormalisasi (spasi, lowercase), termasuk
- * bentuk jamak. Tanpa ini tag "clouds" lolos dan membuat kategori otomatis
- * kembar dari kategori seed "Nature".
- */
 const SEED_TAGS_NORM = new Set(
   [...SEED_TAGS].flatMap((t) => {
     const n = t.replace(/_/g, ' ');
@@ -188,14 +140,6 @@ const SEED_TAGS_NORM = new Set(
   })
 );
 
-/**
- * Tag yang layak masuk trending (kategori & deskriptor generik dieliminasi)
- * supaya panel "Tag populer" benar-benar berguna.
- *
- * DUMMY_TAGS ikut dicek di sini, bukan hanya di canPromote(). Placeholder
- * seperti "character name" tidak berguna di dua tempat: bukan kategori, dan
- * bukan juga tag populer yang ingin diklik pengguna.
- */
 export function isUsefulTag(tag) {
   const t = norm(tag);
   if (t.length < 3 || STOP_TAGS.has(t)) return false;
@@ -229,19 +173,15 @@ const norm = (t) => String(t).toLowerCase().replace(/_/g, ' ').trim();
 
 const DAY = 86400000;
 
-/** Ambang promote. Entitas (nama karakter/series) boleh lebih rendah. */
 const PROMO_MIN_ENTITY = 5;
 const PROMO_MIN_PLAIN = 22;
 
 const MAX_AUTO_CATS = 400;
 
-/** Kategori auto dianggap basi setelah ini tidak tersentuh. */
 const STALE_AFTER = 30 * DAY;
-/** ...dan pun hanya diluruhkan kalau memang tidak pernah dipakai serius. */
 const STALE_MIN_HITS = 12;
 const STALE_BATCH = 120;
 
-/** Penundaan: cap dicek paling sering segitu, meluruh paling sering segitu. */
 const CAP_CHECK_MS = 5 * 60 * 1000;
 const STALE_CHECK_MS = 6 * 60 * 60 * 1000;
 
@@ -324,26 +264,17 @@ function demote(cat, { seedByLabel = null, keepCounter = false } = {}) {
   delete state.cats[cat.id];
 }
 
-/** Kategori auto diurutkan dari yang paling lemah: hit paling sedikit dulu. */
 function autoWeakestFirst() {
   return Object.values(state.cats)
     .filter((c) => c.auto)
     .sort((a, b) => (a.hits || 0) - (b.hits || 0) || (a.lastSeen || 0) - (b.lastSeen || 0));
 }
 
-/**
- * Meluruhkan kategori auto yang sudah lama tidak tersentuh dan tidak pernah
- * dipakai serius. Inilah yang membuat daftar bisa "bernapas": kategori yang
- * terbukti masih relevan akan bertahan, sisanya menyingkir sendiri tanpa
- * perlu campur tangan.
- */
 function sweepStale(now) {
   const cutoff = now - STALE_AFTER;
   const dropped = [];
   for (const cat of autoWeakestFirst()) {
     if (dropped.length >= STALE_BATCH) break;
-    // sudah terurut naik berdasarkan hits, jadi setelah ini tidak ada lagi
-    // yang cukup lemah untuk diluruhkan.
     if ((cat.hits || 0) > STALE_MIN_HITS) break;
     if ((cat.lastSeen || 0) >= cutoff) continue; // masih baru, biarkan saja
     demote(cat, { keepCounter: false });
@@ -372,11 +303,6 @@ function trimToCap() {
 let lastCapAt = 0;
 let lastStaleAt = 0;
 
-/**
- * Jadwalkan pemeliharaan kategori. Sengaja dipanggil dari ingest() tapi hanya
- * jalan kalau sudah lewat interval-nya — inilah "delay" yang membuat cap dan
- * sweep tidak menambah beban ke setiap pencarian.
- */
 function scheduleMaintenance(now) {
   const doStale = now - lastStaleAt >= STALE_CHECK_MS;
   const doCap = now - lastCapAt >= CAP_CHECK_MS;
@@ -399,7 +325,6 @@ function scheduleMaintenance(now) {
   return line;
 }
 
-/** Ringkas daftar label supaya baris log tidak membanjiri terminal. */
 function sample(labels, n = 8) {
   const head = labels.slice(0, n).join(', ');
   return labels.length > n ? `${head}, +${labels.length - n} lagi` : head;
@@ -470,10 +395,6 @@ function matchPatterns(tags) {
 }
 
 /**
- * Kategori baru dibuat dari tag berulang. Hanya entitas (nama karakter/series)
- * yang boleh dipromosikan —Atribut generik seperti "brown_hair" diabaikan.
- */
-/**
  * Bolehkah tag ini dipromosikan menjadi kategori otomatis?
  *
  * Berbeda dari `isUsefulTag` (tag masih berguna untuk seed kategori & trending),
@@ -523,10 +444,6 @@ function autoCount() {
   return n;
 }
 
-/**
- * Ingest wallpaper baru. Dipanggil setiap hasil search.
- * Mengembalikan statisti singkat supaya UI bisa menampilkan toast "kategori baru".
- */
 export function ingest(items = []) {
   const before = new Set(Object.keys(state.cats));
   const now = Date.now();
@@ -537,7 +454,6 @@ export function ingest(items = []) {
     const tags = (it.tags || []).filter((t) => !STOP_TAGS.has(norm(t)));
     const matched = matchPatterns(tags.length ? tags : [norm(it.title || '')]);
     if (it.orientation === 'landscape') matched.add('landscape');
-    // Wallhaven hanya memberi kategori kasar: anime / people / general
     if (it.category === 'anime') {
       matched.add('anime');
       matched.add('girl');
@@ -592,9 +508,6 @@ export function ingest(items = []) {
 
   state.lastIngestAt = now;
 
-  // Cap + sweep kategori. Dipanggil di sini supaya bisa memberi ruang pada
-  // kategori baru, tapi scheduleMaintenance() menundanya sendiri kecuali sudah
-  // lewat intervalnya — jadi ini tidak menambah beban ke setiap pencarian.
   scheduleMaintenance(now);
 
   const fresh = [...Object.keys(state.cats)].filter((id) => !before.has(id));

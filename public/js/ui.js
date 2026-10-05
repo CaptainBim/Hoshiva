@@ -1,4 +1,3 @@
-/* Hoshiva — helper DOM & util kecil */
 
 export const qs = (sel, root = document) => root.querySelector(sel);
 export const qsa = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -44,8 +43,6 @@ export function debounce(fn, ms = 300) {
   };
 }
 
-/* ------------------------------ format ------------------------------ */
-
 export const nf = new Intl.NumberFormat('id-ID');
 
 export function fmtBytes(b) {
@@ -79,8 +76,6 @@ export const titleCase = (s) =>
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-/* ------------------------------ toast ------------------------------ */
-
 let toastHost;
 export function toast(msg, kind = '', ico = '') {
   toastHost ||= qs('#toasts');
@@ -98,8 +93,6 @@ export function toast(msg, kind = '', ico = '') {
   }, 3400);
 }
 
-/* ------------------------------ storage ------------------------------ */
-
 const NS = 'hoshiva:';
 export const store = {
   get(key, fallback) {
@@ -114,12 +107,9 @@ export const store = {
     try {
       localStorage.setItem(NS + key, JSON.stringify(value));
     } catch {
-      /* penuh */
     }
   },
 };
-
-/* --------------------------- image loader --------------------------- */
 
 const imgCache = new Map();
 export function preload(url) {
@@ -133,14 +123,12 @@ export function preload(url) {
   return p;
 }
 
-/** Deteksi ukuran layar kerja (termasuk DPR) untuk preset default. */
 export function screenSize() {
   const w = Math.round((window.screen?.width || window.innerWidth || 1920) * (window.devicePixelRatio || 1));
   const h = Math.round((window.screen?.height || window.innerHeight || 1080) * (window.devicePixelRatio || 1));
   return { w: Math.min(w, 7680), h: Math.min(h, 4320) };
 }
 
-/** Skor "seworthiness" wallpaper: tinggi, lebar, dan selalu proporsional. */
 export function wallpaperScore(item, target) {
   if (!item.width || !item.height) return 0;
   const tw = target?.w || 1920;
@@ -148,9 +136,7 @@ export function wallpaperScore(item, target) {
   const tr = tw / th;
   const r = item.width / item.height;
   let s = Math.min(item.width, tw) / Math.min(tw, item.width);
-  // rasio yang mirip target = lebih cocok jadi wallpaper
   const ratioFit = Math.exp(-Math.abs(Math.log(r / tr)) * 1.6);
-  // butuh resolusi >= target agar tidak pecah
   const hasEnough = item.width >= tw && item.height >= th ? 1 : 0.45;
   return ratioFit * hasEnough * (0.7 + 0.3 * Math.min(item.mp / 4, 1));
 }

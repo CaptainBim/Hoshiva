@@ -72,7 +72,6 @@ app.get(
   })
 );
 
-/** Cek kesehatan tiap sumber (dengan cache pendek). */
 app.get(
   '/api/sources/status',
   wrap(async (_req, res) => {
@@ -130,9 +129,6 @@ app.get(
     };
 
     const order = defaultSourceOrder(q.source && q.source !== 'auto' ? q.source : null);
-    // Filter rasio tidak selalu dihormati sumber (Wallhaven punya daftar `ratios`
-    // sendiri, booru hanya mengandalkan tag yang sering tidak lengkap), jadi kita
-    // minta kelebihan item lalu menyaring sendiri di bawah.
     const fetchOpts = ratio === 'any' ? opts : { ...opts, limit: Math.min(limit * 3, 60) };
     const { results, errors } = await searchSources(order.slice(0, 3), fetchOpts);
 
@@ -140,8 +136,6 @@ app.get(
       return res.status(200).json({ items: [], total: 0, page, errors, sourcesTried: order.slice(0, 3), items0: true });
     }
 
-    // Gabungkan multi-sumber secara round-robin supaya Wallhaven tidak
-    // mengambil seluruh halaman sendirian.
     const seen = new Set();
     const buckets = results.map((r) => r.items.filter((it) => it.thumb && matchesRatio(it, ratio)));
     const items = [];
@@ -165,7 +159,6 @@ app.get(
       if (!progressed) break;
     }
 
-    // Kategori otomatis: setiap wallpaper baru "dimumati" taksonomi
     const tax = taxonomy.ingest(items);
 
     res.json({
@@ -179,7 +172,6 @@ app.get(
   })
 );
 
-/** Detail satu wallpaper (tag lengkap, metadata asli). */
 app.get(
   '/api/post/:source/:id',
   wrap(async (req, res) => {
@@ -200,9 +192,6 @@ app.get(
   wrap(async (req, res) => {
     const includeAuto = req.query.auto !== '0';
     const minHits = num(req.query.minHits, 1);
-    // Default sengaja longgar: UI menampilkan seluruh daftar kategori tanpa
-    // tombol "tampilkan lagi". Yang paling banyak dipakai tetap di atas karena
-    // listCategories() sudah diurutkan berdasarkan hits.
     const limit = num(req.query.limit, 500);
     res.json({
       categories: taxonomy.listCategories({ includeAuto, minHits, limit }),
@@ -219,10 +208,6 @@ app.get(
   })
 );
 
-/**
- * Proxy + resize + upscale.
- * Tanpa w/h/upscale -> stream file asli (kualitas penuh untuk unduhan).
- */
 app.get(
   '/api/img',
   wrap(async (req, res) => {
@@ -346,11 +331,6 @@ app.use((err, _req, res, _next) => {
 const swept = cacheSweep();
 console.log(`[hoshiva] cache sweep: -${swept.removed} / ${swept.kept} kept`);
 
-/**
- * Sweep hanya sekali di boot akan menyisakan entri kedaluwarsa menumpuk di
- * container yang hidup lama, jadi ulangi secara berkala. Berjeda longgar supaya
- * tidak ikut memblokir event loop saat sedang sibuk.
- */
 const SWEEP_MS = 30 * 60 * 1000;
 setInterval(() => {
   try {

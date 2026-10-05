@@ -23,7 +23,6 @@
 </head>
 <body>
 
-<!-- aura latar -->
 <div class="aura" aria-hidden="true">
   <span class="aura__blob aura__blob--1"></span>
   <span class="aura__blob aura__blob--2"></span>
@@ -31,12 +30,9 @@
   <span class="aura__grid"></span>
 </div>
 
-<!-- ============================ HEADER ============================ -->
 <header class="topbar" id="topbar">
   <div class="topbar__inner">
     <a class="brand" href="/" aria-label="Hoshiva beranda">
-      <!-- Dua logo, dipilih lewat html[data-theme]: yang transparan untuk tema
-           terang, yang putih untuk tema gelap (lihat scripts/logo-theme.js). -->
       <img class="brand__logo brand__logo--light" src="/assets/logo.png" alt="Logo Hoshiva" width="1232" height="352" />
       <img class="brand__logo brand__logo--dark" src="/assets/logo-dark.png" alt="" aria-hidden="true" width="1713" height="488" />
     </a>
@@ -82,14 +78,10 @@
   <div class="topbar__progress" id="progress"></div>
 </header>
 
-<!-- ============================ LAYOUT ============================ -->
 <div class="scrim" id="scrim" hidden></div>
 
 <div class="layout">
 
-  <!-- ------------------------ SIDEBAR (drawer) ------------------------ -->
-  <!-- disembunyikan secara bawaan; dibuka lewat tombol "Atur" lalu slide keluar
-       supaya tidak memakan setengah lebar layar. -->
   <aside class="panel" id="panel" aria-label="Filter" aria-hidden="true">
     <div class="panel__head">
       <h2>Filter</h2>
@@ -99,7 +91,6 @@
 
     <div class="panel__body">
 
-      <!-- sumber: hanya yang benar-benar bisa dipanggil -->
       <section class="fgroup">
         <h3 class="fgroup__title">Sumber</h3>
         <div class="radios" id="sourceRow"></div>
@@ -107,14 +98,12 @@
         <div class="srcstatus" id="srcStatus"></div>
       </section>
 
-      <!-- rasio -->
       <section class="fgroup">
         <h3 class="fgroup__title">Rasio gambar</h3>
         <select id="ratioSel"></select>
         <p class="hint">Wallpaper dalam rasio 32:9 atau 9:16 biasanya perlu di-crop manual setelah dibuka.</p>
       </section>
 
-      <!-- kategori otomatis (semua ditampilkan) -->
       <section class="fgroup">
         <h3 class="fgroup__title">
           <span>Kategori</span>
@@ -124,13 +113,11 @@
         <div class="chips chips--cat" id="catRow"></div>
       </section>
 
-      <!-- trending tags -->
       <section class="fgroup">
         <h3 class="fgroup__title">Tag populer</h3>
         <div class="chips chips--sm" id="trendRow"></div>
       </section>
 
-      <!-- sort -->
       <section class="fgroup">
         <h3 class="fgroup__title">Urutkan</h3>
         <div class="segmented" id="sortRow"></div>
@@ -142,7 +129,6 @@
     </div>
   </aside>
 
-  <!-- ------------------------ MAIN ------------------------ -->
   <main class="main" id="main">
     <div class="main__head">
       <div class="statline" id="statline"></div>
@@ -179,12 +165,10 @@
   </main>
 </div>
 
-<!-- ============================ LIGHTBOX ============================ -->
 <div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Detail wallpaper">
   <div class="lb__backdrop" data-close></div>
 
   <div class="lb__shell">
-    <!-- sisi gambar -->
     <div class="lb__stage" id="lbStage">
       <img class="lb__img" id="lbImg" alt="" />
       <div class="lb__spin" id="lbSpin" hidden><span></span><span></span><span></span></div>
@@ -206,7 +190,6 @@
         </div>
       </div>
 
-      <!-- cropper (hanya saat mode crop aktif) -->
       <div class="cropper" id="cropper" hidden>
         <div class="cropper__frame" id="cropFrame">
           <div class="cropper__rule cropper__rule--v"></div>
@@ -219,7 +202,6 @@
       </div>
     </div>
 
-    <!-- sisi informasi -->
     <aside class="lb__info" id="lbInfo">
       <header class="lb__infohead">
         <p class="lb__src" id="lbSrc"></p>
@@ -323,7 +305,6 @@
   </div>
 </div>
 
-<!-- toast -->
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="/js/app.js" type="module"></script>

@@ -1,21 +1,5 @@
 import { UA, FETCH_TIMEOUT } from './config.js';
 
-/* ------------------------------------------------------------------ *
- * Hoshiva source registry
- *
- * Semua sumber dinormalisasi ke shape yang sama:
- *   { id, source, sourceLabel, title, thumb, sample, full,
- *     width, height, ratio, orientation, mp, rating, score,
- *     tags[], createdAt, pageUrl, author, colors? }
- *
- * Sumber "booru" memakai DAPI yang identik, jadi satu adapter cukup untuk
- * semuanya.
- *
- * Catatan: gelbooru, konachan, rule34, dan xbooru sudah dihapus. Sertifikat
- * TLS keempatnya kedaluwarsa 22 Januari 2025 dan domainnya kini dialihkan ke
- * halaman ISP pihak ketiga, jadi tidak lagi menjadi booru yang bisa dipakai.
- * ------------------------------------------------------------------ */
-
 export const BOORU_SOURCES = [
   {
     id: 'safebooru',
@@ -75,14 +59,6 @@ export function aspectInfo(w, h) {
   return { ratio, orientation, mp: +((w * h) / 1e6).toFixed(2) };
 }
 
-/**
- * Batas rasio (lebar/tinggi) untuk tiap filter orientasi.
- *
- * Filter ini dipakai ulang sebagai *jaring pengaman* setelah hasil digabung:
- * Wallhaven hanya menerima `ratios` miliknya sendiri dan booru mengandalkan tag
- * `landscape`/`portrait` yang sering tidak konsisten, sehingga tanpa penyaring
- * lokal hasil "Portrait" masih bisa memuat gambar lanskap.
- */
 export const RATIO_RANGE = {
   landscape: [1.15, Infinity],
   portrait: [0, 0.87],
@@ -91,7 +67,6 @@ export const RATIO_RANGE = {
   ultrawide: [2, Infinity],
 };
 
-/** True bila `item` cocok dengan filter rasio `id` (true juga untuk 'any'). */
 export function matchesRatio(item, id) {
   if (!id || id === 'any') return true;
   const range = RATIO_RANGE[id];
@@ -124,10 +99,6 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT) {
 
 const BOORU_SORT = { fit: ['score', 'desc'], newest: ['id', 'desc'], top: ['score', 'desc'], random: ['random', ''] };
 
-/**
- * Sinonim orang -> tag booru. Tanpa ini "girl" tidak akan nyantol ke tag
- * `1girl` sehingga hasil kosong.
- */
 const BOORU_SYNONYM = {
   girl: '1girl', girls: '1girl', woman: '1girl', women: '1girl', female: '1girl', waifu: '1girl',
   boy: '1boy', boys: '1boy', man: '1boy', men: '1boy', male: '1boy', guy: '1boy',
@@ -184,7 +155,6 @@ function buildBooruTagQuery(opts) {
   return [...new Set(parts)].join(' ');
 }
 
-/** Tag generik yang tidak pantas jadi judul (warna rambut, pakaian, pose). */
 const TITLE_NOISE = [
   'hair', 'eyes', 'eye', 'skin', 'dress', 'shirt', 'skirt', 'uniform', 'thighhighs', 'stockings',
   'smile', 'blush', 'looking_at_viewer', 'long_hair', 'short_hair', 'twintails', 'ponytail',
@@ -198,19 +168,12 @@ const TITLE_NOISE_RE = new RegExp(
   `^(${TITLE_NOISE.join('|')})(_|$)|^\\d+(girl|boy)s?(_|$)|_(girl|boy|child)$`,
   'i'
 );
-/** Tag yang menandakan entitas (karakter / series) — dipakai sebagai judul. */
 const SERIES_HINT = /(series|project|gakuen|shoujo|shounen|clannad|genshin|hololive|idolmaster|love_ru)/i;
 
-/**
- * Pilih judul terbaik dari tag: utamakan nama karakter (pakai tanda kurung),
- * lalu nama series, baru atribut non-generik. Tag deskriptor ("blue hair",
- * "aqua eyes") selalu paling akhir karena tidak informatif.
- */
 function deriveTitle(tags) {
   if (!tags?.length) return 'Wallpaper';
   const clean = tags.filter((t) => t && !TITLE_NOISE_RE.test(t));
 
-  // 1) karakter: "nama_(series)" — paling informatif
   const char = clean.find((t) => /\([^)]+\)/.test(t) && !SERIES_HINT.test(t));
   if (char) return titleCase(char.replace(/\([^)]*\)/g, '').trim() || char);
 
@@ -302,10 +265,6 @@ async function searchBooru(src, opts) {
   const queryTags = toBooruTags(opts.q);
   const hasRatio = /\b(landscape|portrait|tall|square)\b/.test(baseTags);
 
-  /**
-   * Relaksasi progresif:_results kosong itu membosankan, jadi coba longgar
-   * satu per satu — lepas rasio, lalu jumlah kata kunci, lalu rating, lalu filter.
-   */
   const attempts = [];
   const push = (t) => {
     const v = [...new Set(t.split(' ').filter(Boolean))].join(' ');
@@ -314,14 +273,12 @@ async function searchBooru(src, opts) {
 
   push(baseTags);
   if (hasRatio) push(baseTags.replace(/\s*\b(ratio:)?(landscape|portrait|tall|square)\b/g, ''));
-  // lepas kata kunci bertahap dari belakang
   for (let i = queryTags.length - 1; i >= 0; i--) {
     const relaxed = [...new Set([...baseTags.split(' '), ...queryTags].filter(Boolean))];
     relaxed.splice(relaxed.indexOf(queryTags[i]), 1);
     if (i === 0) break;
     push(relaxed.join(' '));
   }
-  // tanpa kata kunci, tanpa rating, tanpa filter dimensi
   push([...new Set(baseTags.split(' ').filter((t) => t && !/^rating:/.test(t) && !/^width:|^height:/.test(t)))].join(' '));
   push([...new Set(baseTags.split(' ').filter((t) => t && !/^rating:/.test(t) && !/^width:|^height:/.test(t) && !queryTags.includes(t)))].join(' '));
 
@@ -379,11 +336,6 @@ const WH_RATIO = {
 
 const WH_WEB = 'https://wallhaven.cc/w';
 
-/**
- * Index post terbaru di memori (max 600). Dipakai supaya endpoint detail
- * bisa melengkapi tag di atas data yang sudah kita punya, tanpa fetch ulang
- * seluruh metadata.
- */
 const postIndex = new Map();
 function indexPost(p) {
   postIndex.set(p.id, p);
@@ -393,13 +345,11 @@ function indexPost(p) {
   }
 }
 
-/** Ambil tag Wallhaven dari halaman publiknya (API detail butuh API key). */
 async function scrapeWhTags(id) {
   const res = await fetchWithTimeout(`${WH_WEB}/${id}`);
   if (!res.ok) throw new Error(`Wallhaven HTML HTTP ${res.status}`);
   const html = await res.text();
 
-  // 1) tag dari <title>: "Cardcaptor Sakura, Kinomoto Sakura | 3508x2480 Wallpaper"
   const metaTitle = (html.match(/<meta\s+name="title"\s+content="([^"]+)"/i) || [])[1] || '';
   const fromTitle = metaTitle
     .split('|')[0]
@@ -423,7 +373,6 @@ function normalizeWhPost(w) {
     id: w.id,
     source: WALLHAVEN.id,
     sourceLabel: WALLHAVEN.label,
-    // placeholder: akan diganti tag asli begitu detail di-scrape
     title: w.source || `${catLabel} Wallpaper`,
     thumb: w.thumbs?.small || w.thumbs?.large,
     sample: w.thumbs?.large || w.path,
@@ -458,7 +407,6 @@ async function searchWallhaven(opts) {
   // PENTING: jangan `new URL('/search', base)` — path absolut '/search' akan
   // membuang '/api/v1' dari base dan kena halaman HTML, bukan endpoint API.
   const u = new URL(`${WALLHAVEN.base}/search`);
-  // general(1) + anime(10) = 011 -> wallpaper fokus anime, tapi tetap ada pilihan
   u.searchParams.set('categories', opts.includeGeneral ? '111' : '011');
   u.searchParams.set('purity', opts.purity === 'nsfw' ? '110' : '100');
   u.searchParams.set('sorting', WH_SORT[opts.sort] || 'toprange');
@@ -474,12 +422,10 @@ async function searchWallhaven(opts) {
   if (!res.ok) throw new Error(`Wallhaven HTTP ${res.status}`);
   const text = await res.text();
   if (!text.trim().startsWith('{')) {
-    // Wallhaven kadang balas halaman HTML (rate-limit / Cloudflare) -> coba lagi
     throw new Error('Wallhaven membalas non-JSON (rate-limit?)');
   }
   const json = JSON.parse(text);
   let items = (json.data || []).map(normalizeWhPost);
-  // Guardrail: Wallhaven ignoring `atleast` -> filter ulang di sisi server
   if (opts.minWidth) items = items.filter((i) => i.width >= opts.minWidth);
   return {
     source: WALLHAVEN.id,
@@ -495,7 +441,6 @@ async function detailWallhaven(id) {
   let tags = [];
   let dims = base ? { width: base.width, height: base.height } : null;
 
-  // 1) coba API resmi (kalau someday tanpa key / ada key punyamu)
   try {
     const res = await fetchWithTimeout(`${WALLHAVEN.base}/search/${encodeURIComponent(id)}`);
     if (res.ok) {
@@ -513,7 +458,6 @@ async function detailWallhaven(id) {
   } catch {
   }
 
-  // 2) fallback: scrape tag dari halaman publik
   const scraped = await scrapeWhTags(id);
   tags = scraped.tags;
   dims = scraped.dims || dims;
@@ -578,7 +522,6 @@ export function detailSource(id, postId) {
   return src.kind === 'wallhaven' ? detailWallhaven(postId) : detailBooru(src, postId);
 }
 
-/** Urutan sumber default: coba wallhaven dulu (wallpaper), lalu booru fallback. */
 export function defaultSourceOrder(preferred) {
   const list = preferred
     ? [preferred, ...ALL_SOURCES.map((s) => s.id).filter((i) => i !== preferred)]

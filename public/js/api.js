@@ -1,4 +1,3 @@
-/* Hoshiva — API client tipis (semua lewat server proxy) */
 
 const j = async (url) => {
   const res = await fetch(url, { headers: { accept: 'application/json' } });
@@ -38,9 +37,7 @@ export function imgUrl(url, o = {}) {
   if (o.w) u.searchParams.set('w', o.w);
   if (o.h) u.searchParams.set('h', o.h);
   if (o.mode && o.mode !== 'raw') u.searchParams.set('mode', o.mode);
-  // Posisi crop untuk mode cover. Tanpa ini server memakai default `centre`.
   if (o.pos) u.searchParams.set('pos', o.pos);
-  // Geser crop 0..100 (50 = tengah). Hanya bermakna untuk mode cover.
   if (o.pan !== undefined && o.pan !== null && o.mode === 'cover') {
     u.searchParams.set('pan', String(Math.min(Math.max(Math.round(o.pan), 0), 100)));
   }
@@ -49,7 +46,6 @@ export function imgUrl(url, o = {}) {
   if (o.quality) u.searchParams.set('quality', o.quality);
   if (o.download) u.searchParams.set('download', '1');
   if (o.ttl) u.searchParams.set('ttl', o.ttl);
-  // Crop manual: fraksi 0..1 dari tiap sisi gambar.
   if (o.crop) {
     const c = o.crop;
     u.searchParams.set('cx', c.x.toFixed(4));

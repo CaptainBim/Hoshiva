@@ -1,6 +1,3 @@
-/* ============================================================
-   Hoshiva
-   ============================================================ */
 
 :root {
   --sakura: #ff7eb6;
@@ -51,7 +48,6 @@ html[data-theme="light"] {
   --shadow-lg: 0 30px 70px -30px rgba(60, 30, 90, .5);
 }
 
-/* ---------------------------- reset ---------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; padding: 0; }
 
@@ -69,9 +65,6 @@ body {
   font-family: Outfit, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
-  /* `vh` di browser mobile mencakup area URL bar yang sedang tersembunyi, jadi
-     halaman jadi lebih tinggi dari viewport yang benar-benar terlihat dan
-     muncul scroll palsu. `dvh` mengikuti tinggi viewport saat ini. */
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
@@ -92,7 +85,6 @@ code {
 }
 ::selection { background: var(--sakura); color: #fff; }
 
-/* scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -105,7 +97,6 @@ code {
 
 :focus-visible { outline: 2px solid var(--sakura); outline-offset: 3px; border-radius: 6px; }
 
-/* --------------------------- aura bg --------------------------- */
 .aura { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .aura__blob {
   position: absolute;
@@ -144,15 +135,12 @@ html[data-theme="light"] .aura__blob { opacity: .32; }
   66% { transform: translate(-4vw, 7vh) scale(.94); }
 }
 
-/* ---------------------------- topbar ---------------------------- */
 .topbar {
   position: sticky; top: 0; z-index: 60;
   backdrop-filter: blur(22px) saturate(160%);
   -webkit-backdrop-filter: blur(22px) saturate(160%);
   background: color-mix(in srgb, var(--bg) 72%, transparent);
   border-bottom: 1px solid var(--stroke);
-  /* Notch dan status bar berada di dalam area sticky. Tanpa padding tambahan
-     ini, logo dan bar pencarian tertutup notch di iPhone. */
   padding-top: env(safe-area-inset-top, 0px);
 }
 .topbar__inner {
@@ -173,7 +161,6 @@ html[data-theme="light"] .aura__blob { opacity: .32; }
 }
 .topbar__progress.is-on { opacity: 1; }
 
-/* brand */
 .brand { display: flex; flex-direction: column; gap: 2px; }
 .brand__logo {
   height: 42px; width: auto;
@@ -182,20 +169,15 @@ html[data-theme="light"] .aura__blob { opacity: .32; }
 }
 .brand:hover .brand__logo { transform: scale(1.03); }
 
-/* Logo varian tema. Hanya satu yang tampil; yang lain disembunyikan supaya
-   tidak ikut memengaruhi layout (dua <img> sejajar dalam flex column). */
 .brand__logo--dark { display: none; }
 html[data-theme="dark"] .brand__logo--light { display: none; }
 html[data-theme="dark"] .brand__logo--dark { display: block; }
-/* Logo putih di header gelap: glow netral dan sangat halus, supaya tidak
-   menabrak warna logo itu sendiri. */
 html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba(220, 230, 255, .16)); }
 .brand__tag {
   font-size: 10px; letter-spacing: .22em; text-transform: uppercase;
   color: var(--text-3); padding-left: 3px;
 }
 
-/* search */
 .search { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 .search__box {
   position: relative;
@@ -241,7 +223,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
   padding: 2px 5px; border-radius: 4px; font-family: inherit;
 }
 
-/* chips */
 .chips { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .chips::-webkit-scrollbar { display: none; }
 .chips--sm { flex-wrap: wrap; overflow: visible; }
@@ -265,7 +246,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 }
 .pill__n { opacity: .55; font-size: 11px; margin-left: 4px; }
 
-/* actions */
 .topbar__actions { display: flex; gap: 8px; }
 .iconbtn {
   position: relative;
@@ -293,18 +273,12 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 }
 @keyframes pulse { 50% { transform: scale(1.35); } }
 
-/* ---------------------------- layout ---------------------------- */
 .layout {
   max-width: 1720px;
   margin: 0 auto;
   padding: 22px;
 }
 
-/* ---------------------------- panel (drawer) ----------------------------
-   Filter disembunyikan secara bawaan di semua ukuran layar dan slide keluar
-   dari kanan saat dibuka. Tidak pernah mengambil lebar tetap, jadi grid
-   wallpaper tetap terlihat penuh.
-   ------------------------------------------------------------------ */
 .scrim {
   position: fixed; inset: 0;
   background: rgba(4, 4, 10, .58);
@@ -322,9 +296,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 .panel {
   position: fixed; top: 0; right: 0;
   width: min(var(--panel-w), 92vw);
-  /* Panel setinggi layar penuh. `100vh` membuat panel lebih tinggi dari area
-     yang terlihat saat URL bar mobile masih muncul, sehingga tombol di bawah
-     tidak bisa dijangkau tanpa menggulir di dalam panel itu sendiri. */
   height: 100vh;
   height: 100dvh;
   background: var(--bg-2);
@@ -338,8 +309,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
   transition: transform .34s var(--ease), visibility .34s;
 }
 .panel.is-open { transform: translateX(0); visibility: visible; }
-/* Panel ini menempel di atas dan tidak ikut ter-scroll, jadi safe area tidak
-   bisa ditangani lewat padding elemen di dalamnya. */
 .panel__head {
   padding-top: calc(16px + env(safe-area-inset-top, 0px));
 }
@@ -389,7 +358,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 .hint { font-size: 11.5px; color: var(--text-3); line-height: 1.55; margin-top: 9px; }
 .hint code { font-size: 10.5px; }
 
-/* segmented */
 .segmented {
   display: flex; flex-wrap: wrap; gap: 5px;
   background: var(--surface);
@@ -411,7 +379,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
   box-shadow: 0 4px 14px -6px rgba(255, 95, 162, .9);
 }
 
-/* radios */
 .radios { display: flex; flex-direction: column; gap: 6px; }
 .radio {
   display: flex; align-items: center; gap: 9px;
@@ -431,7 +398,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 }
 .radio__hint { font-size: 10.5px; color: var(--text-3); margin-left: auto; }
 
-/* switch */
 .switch { display: flex; align-items: center; gap: 10px; margin-top: 12px; cursor: pointer; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch__ui {
@@ -448,7 +414,6 @@ html[data-theme="dark"] .brand__logo--dark { filter: drop-shadow(0 3px 14px rgba
 .switch input:checked + .switch__ui::after { left: 20px; background: #fff; }
 .switch__label { font-size: 12.5px; color: var(--text-2); }
 
-/* size */
 .sizebox {
   margin-top: 13px; padding: 13px;
   background: var(--surface);
@@ -513,7 +478,6 @@ select option { background: var(--bg-2); color: var(--text); }
 .srcchip.up i { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
 .srcchip.down i { background: var(--sakura-2); }
 
-/* ---------------------------- main ---------------------------- */
 .main { min-width: 0; }
 .main__head {
   display: flex; align-items: center; justify-content: space-between;
@@ -529,7 +493,6 @@ select option { background: var(--bg-2); color: var(--text); }
 }
 .viewtoggle { display: flex; gap: 5px; flex: none; }
 
-/* ---------------------------- grid ---------------------------- */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
@@ -569,7 +532,6 @@ select option { background: var(--bg-2); color: var(--text); }
 .card:hover .card__img { transform: scale(1.055); }
 .card.is-upscaled .card__img { image-rendering: auto; }
 
-/* skeleton */
 .card--sk { aspect-ratio: 3 / 4; cursor: default; border-color: transparent; }
 .card--sk:hover { transform: none; box-shadow: none; }
 .card--sk::after {
@@ -581,7 +543,6 @@ select option { background: var(--bg-2); color: var(--text); }
 .grid[data-view="list"] .card--sk { aspect-ratio: auto; height: 108px; }
 @keyframes shimmer { to { background-position: -120% 0; } }
 
-/* overlay card */
 .card__ov {
   position: absolute; inset: 0;
   padding: 11px;
@@ -628,7 +589,6 @@ select option { background: var(--bg-2); color: var(--text); }
 .card__act svg { width: 13px; height: 13px; fill: currentColor; }
 .card__act--go { background: var(--grad); border-color: transparent; }
 
-/* list mode */
 .grid[data-view="list"] .card__body {
   padding: 14px 16px;
   display: flex; flex-direction: column; justify-content: center; gap: 5px;
@@ -647,7 +607,6 @@ select option { background: var(--bg-2); color: var(--text); }
 .grid[data-view="list"] .card__tags { color: var(--text-3); white-space: normal; }
 .grid[data-view="list"] .card__foot { max-width: 320px; }
 
-/* badge umum di card */
 .card__flag {
   position: absolute; top: 10px; left: 10px; z-index: 2;
   font-size: 9.5px; font-weight: 700; letter-spacing: .06em;
@@ -661,7 +620,6 @@ select option { background: var(--bg-2); color: var(--text); }
   background: rgba(160, 107, 255, .92); color: #fff;
   display: flex; align-items: center; gap: 3px;
 }
-/* penanda resolusi lebih kecil dari target layar */
 .card__low {
   position: absolute; bottom: 10px; left: 10px; z-index: 2;
   font-size: 9.5px; font-weight: 700;
@@ -670,7 +628,6 @@ select option { background: var(--bg-2); color: var(--text); }
 }
 .card:hover .card__low { opacity: 0; }
 
-/* ------------------------- empty & loader ------------------------- */
 .empty {
   text-align: center;
   padding: 70px 20px;
@@ -695,33 +652,18 @@ select option { background: var(--bg-2); color: var(--text); }
 
 .foot {
   display: flex; align-items: center; gap: 14px;
-  /* `10px` saja membuat logo footer tertutup gesture bar / home indicator
-     di ponsel yang pakai navigasi gesture. */
   padding: 26px 6px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--stroke);
   margin-top: 20px;
   font-size: 12px; color: var(--text-3);
 }
 .foot__logo { height: 30px; width: auto; }
-/* Logo footer mengikuti tema, sama seperti header: varian terang untuk latar
-   terang, varian putih untuk latar gelap.
-
-   opacity WAJIB berbeda per tema, dan itu bukan soal selera. Kedua logo punya
-   polaritas terbalik, jadi satu nilai tidak bisa melayani keduanya:
-     - terang: bg rgb(247,245,251), stroke logo ~L0.01. Pada .55 kontras hanya
-       2.07:1 - gagal WCAG AA, logonya praktis tak terbaca.
-     - gelap : bg rgb(8,8,15), stroke logo L1.0. Pada .55 kontras 10.5:1,
-       terlalu menonjol untuk sebuah footer.
-   .85 di terang -> ~4.9:1 (lolos AA); .4 di gelap -> ~8.5:1 (lolos, tetap
-   redup). grayscale() hanya pada varian terang: logo varian gelap sudah putih
-   sehingga filter itu tidak menambah apa-apa, hanya membuat putihnya keruh. */
 .foot__logo--light { opacity: .85; filter: grayscale(.25); }
 .foot__logo--dark { display: none; }
 html[data-theme="dark"] .foot__logo--light { display: none; }
 html[data-theme="dark"] .foot__logo--dark { display: block; opacity: .7; filter: none; }
 .foot strong { color: var(--text-2); }
 
-/* ---------------------------- buttons ---------------------------- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   background: var(--surface-2);
@@ -744,7 +686,6 @@ html[data-theme="dark"] .foot__logo--dark { display: block; opacity: .7; filter:
 .btn--icon { padding: 10px; }
 .btn[disabled] { opacity: .5; pointer-events: none; }
 
-/* ---------------------------- lightbox ---------------------------- */
 .lb { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; }
 .lb[hidden] { display: none; }
 .lb__backdrop {
@@ -775,7 +716,6 @@ html[data-theme="dark"] .foot__logo--dark { display: block; opacity: .7; filter:
   from { opacity: 0; transform: scale(.96) translateY(14px); }
 }
 
-/* stage */
 .lb__stage {
   position: relative;
   background:
@@ -868,7 +808,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .85);
 }
 
-/* info pane */
 .lb__info {
   border-left: 1px solid var(--stroke);
   padding: 22px;
@@ -920,7 +859,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* upscale box */
 .upscale-box {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -929,7 +867,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
 }
 .upscale-box .hint { margin: 0 0 10px; }
 
-/* input angka untuk lebar/tinggi (pengganti slider) */
 .sizebox__nums {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px; margin: 10px 0;
@@ -952,7 +889,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
 .sizebox__nums input[type="number"]::-webkit-outer-spin-button,
 .sizebox__nums input[type="number"]::-webkit-inner-spin-button { opacity: .45; }
 
-/* crop */
 .cropbox {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -997,7 +933,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
 .cropper__grip--sw { bottom: -8px; left: -8px; border-right: 0; border-top: 0; cursor: nesw-resize; }
 .cropper__grip--se { bottom: -8px; right: -8px; border-left: 0; border-top: 0; cursor: nwse-resize; }
 
-/* tags */
 .tagcloud { display: flex; flex-wrap: wrap; gap: 5px; max-height: 210px; overflow-y: auto; }
 .tag {
   font-size: 11.5px;
@@ -1020,7 +955,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
 .sim img { width: 100%; height: 100%; object-fit: cover; }
 .sim:hover { border-color: var(--sakura); transform: scale(1.06); }
 
-/* ---------------------------- toasts ---------------------------- */
 .toasts {
   position: fixed; bottom: 22px; right: 22px; z-index: 300;
   display: flex; flex-direction: column; gap: 9px;
@@ -1045,7 +979,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
 @keyframes slidein { from { opacity: 0; transform: translateX(40px); } }
 @keyframes slideout { to { opacity: 0; transform: translateX(40px); } }
 
-/* ---------------------------- responsive ---------------------------- */
 @media (max-width: 1180px) {
   .lb__shell { grid-template-columns: minmax(0, 1fr) 340px; }
 }
@@ -1059,9 +992,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   .topbar__actions { grid-column: 1 / -1; justify-content: flex-end; }
   .brand__logo { height: 34px; }
   .layout { padding: 14px; }
-  /* Info pindah ke bawah gambar. Batasnya min(46dvh, 320px): pada ponsel tegak
-     46dvh masih utuh, dan di layar pendek sisanya dikecilkan supaya area gambar
-     tidak habis. */
   .lb__shell {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
@@ -1080,22 +1010,14 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   .toasts { left: 14px; right: 14px; bottom: 14px; }
   .toast { max-width: none; }
 
-  /* Target sentuh. Apple menyarankan 44px, Android 48px; di desktop semua
-     target ini jauh lebih kecil karena memakai tetikus. Menambahnya hanya di
-     layar sentuh menjaga kepadatan desktop apa adanya. */
   .search__clear { width: 44px; height: 44px; font-size: 24px; }
   .iconbtn--ghost { padding: 13px; }
   .lb__closebtn { width: 44px; height: 44px; }
   .btn { min-height: 44px; }
   .linkbtn { padding: 10px 2px; display: inline-block; }
-  /* Cegah zoom otomatis iOS: input dengan font di bawah 16px membuat Safari
-     memperbesar halaman saat difokus. */
   .search__input, select, input[type="number"] { font-size: 16px; }
 }
 
-/* Ponsel Landscape: tinggi layar hanya sekitar 390px, jadi aturan lebar di
-   atas membuat lightbox menumpuk gambar di atas info dan keduanya tidak
-   muat. Di sini kembalikan tata letak samping-ke-samping. */
 @media (max-width: 900px) and (max-height: 520px) {
   .lb__shell {
     grid-template-columns: minmax(0, 1fr) minmax(240px, 38%);
@@ -1126,9 +1048,6 @@ html[data-theme="light"] .lb__stage { background: #0a0a12; }
   .foot__logo { height: 26px; }
 }
 
-/* Layar sangat sempit (iPhone SE 320px). Dengan minmax 150px, dua kolom
-   membutuhkan 310px sedangkan yang tersedia hanya 292px, jadi grid jatuh ke
-   satu kolom berisi kartu raksasa. Turunkan ambangnya supaya dua kolom muat. */
 @media (max-width: 400px) {
   .layout { padding: 10px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
