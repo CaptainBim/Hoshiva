@@ -41,8 +41,6 @@ export const ALL_SOURCES = [WALLHAVEN, ...BOORU_SOURCES];
 const byId = new Map(ALL_SOURCES.map((s) => [s.id, s]));
 export const getSource = (id) => byId.get(id);
 
-/* ----------------------------- utils ----------------------------- */
-
 const decodeXml = (s = '') =>
   s
     .replace(/&lt;/g, '<')
@@ -53,7 +51,6 @@ const decodeXml = (s = '') =>
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
     .replace(/&amp;/g, '&');
 
-/** Parser minimal untuk XML DAPI: elemen <post attr="v" ... /> */
 function parseBooruXml(xml) {
   const total = Number((xml.match(/<posts[^>]*count="(\d+)"/) || [])[1] || 0);
   const offset = Number((xml.match(/<posts[^>]*offset="(\d+)"/) || [])[1] || 0);
@@ -125,8 +122,6 @@ async function fetchWithTimeout(url, opts = {}, ms = FETCH_TIMEOUT) {
   }
 }
 
-/* --------------------------- booru adapter --------------------------- */
-
 const BOORU_SORT = { fit: ['score', 'desc'], newest: ['id', 'desc'], top: ['score', 'desc'], random: ['random', ''] };
 
 /**
@@ -148,7 +143,6 @@ const BOORU_SYNONYM = {
   ultra_wide: null, ultrawide: null, hd: null, '4k': null, phone: null, desktop: null,
 };
 
-/** Bersihkan query user -> tag booru yang valid (AND semantics). */
 function toBooruTags(q) {
   if (!q) return [];
   return String(q)
@@ -198,7 +192,6 @@ const TITLE_NOISE = [
   'large_breasts', 'medium_breasts', 'small_breasts', 'absurd_res', 'highres', 'blue_eyes',
   'brown_hair', 'black_hair', 'blonde_hair', 'one_eye', 'female_focus', 'girls_focus',
 ];
-/** Tag yang isinya cuma atribut fisik — tidak pernah jadi judul. */
 const DESCRIPTOR_RE =
   /(^|_)(hair|eyes?|skin|dress|shirt|skirt|uniform|thighhighs?|stockings?|boots?|shoes?|gloves?|hat|bow|ribbon|necktie|boots|bra|swimsuit|bikini|smile|blush|open_mouth|closed_mouth|looking_at_viewer|female|male|child|eyeshadow|lips|nose|ears|hairband|hairclip|headband|collar|buttons|shading)(_|$)|(color|colour)$|_color$|^color_/i;
 const TITLE_NOISE_RE = new RegExp(
@@ -221,11 +214,9 @@ function deriveTitle(tags) {
   const char = clean.find((t) => /\([^)]+\)/.test(t) && !SERIES_HINT.test(t));
   if (char) return titleCase(char.replace(/\([^)]*\)/g, '').trim() || char);
 
-  // 2) series / franchise
   const series = clean.find((t) => /!$/.test(t) || SERIES_HINT.test(t));
   if (series) return titleCase(series.replace(/!$/, ''));
 
-  // 3) tag non-deskriptif, pilih yang paling informatif
   const meaningful = clean.filter((t) => !DESCRIPTOR_RE.test(t) && t.length > 3);
   if (meaningful.length) {
     const multi = meaningful.find((t) => t.includes('_'));
@@ -233,7 +224,6 @@ function deriveTitle(tags) {
   }
   if (clean.length) return titleCase(clean.find((t) => !DESCRIPTOR_RE.test(t)) || clean[0]);
 
-  // 4) benar-benar tidak ada yang bagus — pakai tag pertama
   return titleCase(tags.find((t) => !TITLE_NOISE_RE.test(t)) || tags[0]);
 }
 
@@ -373,8 +363,6 @@ async function detailBooru(src, id) {
   return normalizeBooruPost(items[0], src);
 }
 
-/* ------------------------- wallhaven adapter ------------------------- */
-
 const WH_SORT = {
   fit: 'toprange',
   newest: 'new',
@@ -389,7 +377,6 @@ const WH_RATIO = {
   tall: '0.6x1',
 };
 
-/** Wallhaven base untuk halaman publik (dipakai scraping tag). */
 const WH_WEB = 'https://wallhaven.cc/w';
 
 /**
@@ -401,7 +388,6 @@ const postIndex = new Map();
 function indexPost(p) {
   postIndex.set(p.id, p);
   if (postIndex.size > 600) {
-    // buang yang paling lama insertion-order
     const first = postIndex.keys().next().value;
     postIndex.delete(first);
   }
@@ -421,7 +407,6 @@ async function scrapeWhTags(id) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // 2) tag dari <a class="tagname">
   const fromLinks = [...html.matchAll(/<a[^>]*class="tagname"[^>]*>([^<]+)<\/a>/g)]
     .map((m) => m[1].replace(/\s+/g, ' ').trim())
     .filter((t) => t && t.length > 1 && !t.includes('{') && !t.startsWith('+'));
@@ -526,7 +511,6 @@ async function detailWallhaven(id) {
       }
     }
   } catch {
-    /* lanjut scraping */
   }
 
   // 2) fallback: scrape tag dari halaman publik
@@ -541,7 +525,6 @@ async function detailWallhaven(id) {
     return merged;
   }
 
-  // 3) tidak pernah terlihat di search -> bangun dari data yang ada
   const w = dims?.width || 0;
   const h = dims?.height || 0;
   const dim = aspectInfo(w, h);
@@ -568,8 +551,6 @@ async function detailWallhaven(id) {
   indexPost(built);
   return built;
 }
-
-/* ------------------------------ public ------------------------------ */
 
 export async function searchSources(order, opts) {
   const results = [];

@@ -8,7 +8,6 @@ const j = async (url) => {
       const b = await res.json();
       if (b.error) msg = b.error;
     } catch {
-      /* bukan json */
     }
     throw new Error(msg);
   }
@@ -32,7 +31,6 @@ export const getCategories = () => j('/api/categories');
 export const getFresh = (limit = 30) => j(`/api/categories/fresh?limit=${limit}`);
 export const getSourcesStatus = () => j('/api/sources/status');
 
-/** Bangun URL proxy gambar untuk resize + crop + upscale. */
 export function imgUrl(url, o = {}) {
   if (!url) return '';
   const u = new URL('/api/img', location.origin);

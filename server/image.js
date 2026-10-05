@@ -79,7 +79,6 @@ function isPrivateIp(ip) {
     if (a >= 224) return true;                                             // multicast + reserved
     return false;
   }
-  // IPv6
   const t = ip.text;
   if (t === '::' || t === '::1') return true;
   if (t.startsWith('fe80') || t.startsWith('fc') || t.startsWith('fd')) return true; // link-local + ULA
@@ -157,8 +156,6 @@ export async function download(url, { maxBytes = 40 * 1024 * 1024, timeout = FET
   }
 }
 
-/* ------------------------- deteksi waifu2x ------------------------- */
-
 /**
  * Cari binary waifu2x. Path dari env selalu dicek; nama perintah di PATH
  * diverifikasi benar-benar ada supaya laporan status tidak berbohong.
@@ -216,8 +213,6 @@ function runWaifu2x(bin, inFile, outFile, scale) {
   });
 }
 
-/* --------------------------- profile sharpen --------------------------- */
-
 /**
  * Profil penajaman, dari yang paling ringan ke paling tegas untuk garis anime:
  *  - none  : resize Lanczos3 biasa
@@ -232,8 +227,6 @@ const PROFILES = {
 
 export const UPSCALE_PROFILE = PROFILES;
 
-/* ------------------------------ pipeline ------------------------------ */
-
 /**
  * Normalisasi dimensi. 0 / NaN / negatif berarti "tidak ditentukan" dan
  * dikembalikan apa adanya sebagai 0 — bukan dipaksa jadi 1, karena angka 1
@@ -245,8 +238,6 @@ const clampDim = (n) => {
   return Math.min(v, MAX_OUTPUT_PX);
 };
 
-/* --------------------------------- crop --------------------------------- */
-
 /**
  * Luas crop minimum sebagai fraksi dari tiap sisi gambar.
  *
@@ -256,7 +247,6 @@ const clampDim = (n) => {
  */
 export const MIN_CROP_FRAC = 0.15;
 
-/** Sisi terpendek hasil crop yang masih layak (piksel). */
 export const MIN_CROP_PX = 320;
 
 /** Pecahan 0..1; kembalikan null bila bukan angka. */
@@ -399,7 +389,6 @@ export async function transform(buffer, opt = {}) {
     profile = PROFILES[opt.upscale] || null;
   }
 
-  // 1. Resize target
   const w = clampDim(opt.w);
   const h = clampDim(opt.h);
   let resize = null;
@@ -440,8 +429,6 @@ export async function transform(buffer, opt = {}) {
 
   const upscaling = !!resize && (srcW < (resize.width || srcW) || srcH < (resize.height || srcH));
 
-  // 2. Composite hasil resize (crop dulu, lalu denoise sebelum upscale,
-  //    lalu sharpen sesudahnya)
   let img = sharp(buffer, { failOn: 'none' });
   if (crop) img = img.extract(crop);
   if (region) img = img.extract(region);
@@ -456,7 +443,6 @@ export async function transform(buffer, opt = {}) {
     out = img;
   }
 
-  // 3. Encode
   const hasAlpha = !!meta.hasAlpha;
   const fm = opt.fm || (hasAlpha ? 'png' : 'jpg');
   const q = Math.min(Math.max(Number(opt.quality) || 92, 40), 100);

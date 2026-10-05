@@ -16,15 +16,12 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json());
 
-/* ------------------------------ helpers ------------------------------ */
-
 const num = (v, d) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 };
 const bool = (v) => v === '1' || v === 'true' || v === true || v === 'on';
 
-/** Batas aman untuk URL gambar eksternal (hydration simple). */
 function hydrateImage(u) {
   if (!u) return null;
   try {
@@ -35,7 +32,6 @@ function hydrateImage(u) {
   return u;
 }
 
-/** Error akibat input/sub-request yang tidak valid -> 400, bukan 500. */
 class BadRequest extends Error {
   constructor(msg) {
     super(msg);
@@ -50,8 +46,6 @@ const wrap = (fn) => (req, res) => {
     if (!res.headersSent) res.status(clientError ? 400 : 500).json({ error: e.message || 'Server error' });
   });
 };
-
-/* ------------------------------- config ------------------------------- */
 
 app.get(
   '/api/config',
@@ -77,8 +71,6 @@ app.get(
     res.json({ ok: true, uptime: process.uptime(), stats: taxonomy.stats(), cache: cacheStats() });
   })
 );
-
-/* -------------------------------- search ------------------------------- */
 
 /** Cek kesehatan tiap sumber (dengan cache pendek). */
 app.get(
@@ -203,8 +195,6 @@ app.get(
   })
 );
 
-/* ------------------------------ taxonomy ------------------------------ */
-
 app.get(
   '/api/categories',
   wrap(async (req, res) => {
@@ -228,8 +218,6 @@ app.get(
     res.json({ items: taxonomy.freshPosts(Math.min(num(req.query.limit, 24), 60)) });
   })
 );
-
-/* -------------------------------- image -------------------------------- */
 
 /**
  * Proxy + resize + upscale.
@@ -314,7 +302,6 @@ app.get(
   })
 );
 
-/** Metadata gambar (untuk info di modal). */
 app.get(
   '/api/img/meta',
   wrap(async (req, res) => {
@@ -335,8 +322,6 @@ app.get(
     res.json(meta);
   })
 );
-
-/* -------------------------------- static -------------------------------- */
 
 app.use(
   express.static(path.join(ROOT, 'public'), {
@@ -372,7 +357,6 @@ setInterval(() => {
     const r = cacheSweep();
     if (r.removed) console.log(`[hoshiva] cache sweep: -${r.removed} / ${r.kept} kept`);
   } catch {
-    /* ignore */
   }
 }, SWEEP_MS).unref();
 

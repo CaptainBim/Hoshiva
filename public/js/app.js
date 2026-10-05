@@ -1,13 +1,8 @@
-/* ============================================================
-   Hoshiva — logika aplikasi
-   ============================================================ */
 import { getConfig, search, getPost, getCategories, getSourcesStatus, imgUrl } from './api.js';
 import {
   qs, qsa, el, setKids, esc, debounce, nf, fmtBytes, fmtDate, titleCase,
   toast, store, preload, screenSize, wallpaperScore,
 } from './ui.js';
-
-/* ------------------------------- state ------------------------------- */
 
 const LS = store.get('filters', {});
 
@@ -66,8 +61,6 @@ let progressTimer = null;
 /** Batas crop, diselaraskan dengan server lewat /api/config. */
 const cropLimits = { min: 0.15, minPx: 320 };
 
-/* ============================== BOOT ============================== */
-
 /**
  * Akses elemen via id: dom.panel, dom.grid, ...
  * Pakai Proxy supaya id baru otomatis ter-resolve (dan ketahuan kalau salah tulis).
@@ -89,14 +82,10 @@ const dom = new Proxy(
 
 /** Id yang wajib ada. Kalau ada yang hilang, gagal cepat & jelas. */
 const REQUIRED_IDS = [
-  // header + drawer
   'searchForm', 'q', 'clearQ', 'quickChips', 'btnTheme', 'btnNew', 'newDot',
   'scrim', 'panel', 'closePanel', 'btnFilters', 'filterDot', 'applyFilters', 'resetFilters',
-  // isi drawer
   'sourceRow', 'srcStatus', 'srcHint', 'ratioSel', 'catRow', 'catBadge', 'trendRow', 'sortRow',
-  // grid
   'grid', 'statline', 'empty', 'emptyTitle', 'emptyText', 'emptyRetry', 'loadMore', 'spinner', 'progress',
-  // lightbox
   'lb', 'lbStage', 'lbImg', 'lbSpin', 'lbSrc', 'lbTitle', 'lbMeta', 'lbInfo', 'dlBtn', 'dlLabel',
   'copyBtn', 'favBtn', 'origBtn', 'specGrid', 'upscaleNote', 'runUpscale',
   'tagCloud', 'tagCount', 'similar', 'lbPrev', 'lbNext', 'lbDims',
@@ -117,11 +106,9 @@ function cacheDom() {
 async function boot() {
   cacheDom();
 
-  // tema
   const theme = store.get('theme', 'dark');
   document.documentElement.dataset.theme = theme;
 
-  // ukuran layar -> preset default
   if (!LS.w || !LS.h) {
     const s = screenSize();
     state.w = s.w;
@@ -175,12 +162,9 @@ async function boot() {
   wire();
   runSearch({ reset: true });
 
-  // polling ringan untuk statistik kategori
   setInterval(refreshCategories, 45000);
   checkFreshBadge();
 }
-
-/* ============================== BUILDERS ============================== */
 
 function buildPresets() {
   dom.presetRow.replaceChildren(
@@ -235,7 +219,6 @@ function buildSources() {
       'Tidak ada sumber yang bisa dihubungi saat ini — semua pencarian memakai mode Otomatis.';
   }
 
-  // Sumber yang tadinya dipilih kebetulan mati: kembalikan ke Otomatis.
   if (state.source !== 'auto' && !list.some((s) => s.id === state.source)) {
     state.source = 'auto';
     runSearch({ reset: true });
@@ -286,8 +269,6 @@ function buildSort() {
     )
   );
 }
-
-/* ============================== SEARCH ============================== */
 
 let searchToken = 0;
 
@@ -343,7 +324,6 @@ async function runSearch({ reset = false } = {}) {
       state.items.push(...fresh);
     }
 
-    // tandai yang benar-benar baru (belum pernah dilihat di perangkat ini)
     state.freshKeys = new Set();
     for (const it of items) {
       const key = `${it.source}:${it.id}`;
@@ -445,7 +425,6 @@ async function refreshCategories() {
     renderCategories();
     renderTrending();
   } catch {
-    /* diam */
   }
 }
 
@@ -487,8 +466,6 @@ function renderTrending() {
   );
 }
 
-/* ============================== RENDER GRID ============================== */
-
 function renderGrid() {
   const frag = document.createDocumentFragment();
   const target = { w: state.w, h: state.h };
@@ -500,8 +477,6 @@ function renderGrid() {
   dom.grid.replaceChildren(frag);
   observeEnrichment();
 }
-
-/* ---------------- lazy tag enrichment ---------------- */
 
 /**
  * Wallhaven hanya mengembalikan ID di hasil search (tag-nya ada di halaman
@@ -556,7 +531,6 @@ function pumpEnrich() {
         patchCard(key, target);
       })
       .catch(() => {
-        /* enrichment bersifat opsional */
       })
       .finally(() => {
         enrichActive--;
@@ -693,8 +667,6 @@ async function quickDownload(it) {
     '⬇️'
   );
 }
-
-/* ============================== SIZE & UPSCALE ============================== */
 
 function applyPreset(id, opts = {}) {
   const p = cfg.presets.find((x) => x.id === id);
@@ -887,8 +859,6 @@ function persistFilters() {
   });
 }
 
-/* ============================== LIGHTBOX ============================== */
-
 let lbItem = null;
 
 function openLB(key, dl = false) {
@@ -964,7 +934,6 @@ async function paintLB({ sizeOnly = false } = {}) {
     it.score ? el('span', { class: 'mchip', text: `★ ${nf.format(it.score)}` }) : null
   );
 
-  // spesifikasi
   const cropPx = state.crop && it.width
     ? { w: Math.round(state.crop.w * it.width), h: Math.round(state.crop.h * it.height) }
     : null;
@@ -1072,7 +1041,6 @@ async function loadDetail(it) {
     dom.similar.replaceChildren();
     loadSimilar(full);
   } catch {
-    /* biarkan tag dari hasil search */
   }
 }
 
@@ -1169,7 +1137,6 @@ function updateLbImage() {
   tmp.onload = done;
   tmp.onerror = () => {
     if (gen !== lbImageGen) return;
-    // fallback ke sample
     if (lbItem?.sample) {
       dom.lbImg.src = imgUrl(lbItem.sample, {
         w: state.w, h: state.h, mode: state.fit, pos: state.pos,
@@ -1414,7 +1381,6 @@ function openCropForSize() {
 
 function startCrop() {
   if (!lbItem || state.cropDraft) return;
-  // Mulai dari crop yang sudah aktif, atau dari kotak tengah 80%.
   state.cropDraft = state.crop ? { ...state.crop } : clampCrop({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
   paintCropUi();
   updateLbImage();
@@ -1538,8 +1504,6 @@ function onCropPointerDown(e) {
   dom.cropper.addEventListener('pointercancel', up);
 }
 
-/* ============================== ACTIONS ============================== */
-
 function toggleCat(c) {
   const i = state.selCats.indexOf(c.id);
   if (i >= 0) state.selCats.splice(i, 1);
@@ -1617,7 +1581,6 @@ async function loadSourcesStatus() {
     // Bangun ulang radio sumber: yang mati tidak boleh dipilih.
     buildSources();
   } catch {
-    /* diam */
   }
 }
 
@@ -1631,7 +1594,6 @@ async function checkFreshBadge() {
     }
     dom.newDot.hidden = fresh === 0;
   } catch {
-    /* diam */
   }
 }
 
@@ -1642,8 +1604,6 @@ async function checkFreshInFeed() {
   dom.newDot.hidden = true;
   toast(`Feed terbaru dimuat — ${state.items.length} wallpaper`, 'ok', '✨');
 }
-
-/* ============================== WIRING ============================== */
 
 function wire() {
   watchCropFrame();
@@ -1669,7 +1629,6 @@ function wire() {
     dom.q.focus();
   });
 
-  // quick chips
   const quick = ['sakura', 'waifu', 'cyberpunk', 'landscape', 'sunset', 'city night', 'fantasy', 'school', 'minimal', 'space'];
   dom.quickChips.replaceChildren(
     ...quick.map((t) =>
@@ -1686,13 +1645,11 @@ function wire() {
     )
   );
 
-  // panel: drawer yang slide keluar, di semua ukuran layar
   dom.btnFilters.addEventListener('click', () => togglePanel());
   dom.closePanel.addEventListener('click', closePanel);
   dom.scrim.addEventListener('click', closePanel);
   dom.applyFilters.addEventListener('click', closePanel);
 
-  // tema
   dom.btnTheme.addEventListener('click', () => {
     const cur = document.documentElement.dataset.theme;
     const next = cur === 'dark' ? 'light' : 'dark';
@@ -1701,7 +1658,6 @@ function wire() {
     toast(`Tema ${next === 'dark' ? 'gelap' : 'terang'}`, '', next === 'dark' ? '🌙' : '☀️');
   });
 
-  // view
   qsa('.viewtoggle .iconbtn').forEach((b) =>
     b.addEventListener('click', () => {
       state.view = b.dataset.view;
@@ -1769,7 +1725,6 @@ function wire() {
     refreshLbIfOpen();
   });
 
-  // crop
   dom.cropStart.addEventListener('click', startCrop);
   dom.tbCrop.addEventListener('click', () => (state.cropDraft ? cancelCrop() : startCrop()));
   dom.cropApply.addEventListener('click', applyCrop);
@@ -1810,21 +1765,18 @@ function wire() {
     toast('Filter direset', 'ok', '↺');
   });
 
-  // muat lagi
   dom.loadMore.addEventListener('click', () => {
     state.page += 1;
     runSearch();
   });
   dom.emptyRetry.addEventListener('click', () => runSearch({ reset: true }));
 
-  // tombol baru
   dom.btnNew.addEventListener('click', () => {
     state.sort = 'newest';
     buildSort();
     checkFreshInFeed();
   });
 
-  // lightbox
   qsa('[data-close]').forEach((n) => n.addEventListener('click', closeLB));
   dom.lbPrev.addEventListener('click', () => step(-1));
   dom.lbNext.addEventListener('click', () => step(1));
@@ -1900,7 +1852,6 @@ function wire() {
     else if (e.clientX - r.left > r.width * 0.78) step(1);
   });
 
-  // infinite scroll
   window.addEventListener(
     'scroll',
     debounce(() => {
@@ -1912,7 +1863,6 @@ function wire() {
     }, 260)
   );
 
-  // keyboard
   window.addEventListener('keydown', (e) => {
     const typing = /input|textarea|select/i.test(document.activeElement?.tagName || '');
     if (e.key === '/' && !typing) {
@@ -1945,7 +1895,6 @@ function wire() {
   });
 }
 
-/** Buka/tutup drawer filter. */
 function togglePanel() {
   const open = !dom.panel.classList.contains('is-open');
   if (open) {
@@ -1989,5 +1938,4 @@ function zoom(k) {
   updateCropFrame();
 }
 
-/* ============================== START ============================== */
 boot();

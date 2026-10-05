@@ -99,7 +99,6 @@ export const RATIOS = [
   { id: 'ultrawide', label: 'Ultrawide' },
 ];
 
-/** Kategori dasar yang selalu ada, sisanya auto-derived dari tag API. */
 export const SEED_CATEGORIES = [
   { id: 'anime', label: 'Anime', emoji: '🌸' },
   { id: 'girl', label: 'Waifu', emoji: '💗' },

@@ -96,7 +96,6 @@ export function cacheGet(key) {
     }
     fs.unlinkSync(fileOf(k));
   } catch {
-    /* cache miss */
   }
   return undefined;
 }
@@ -156,7 +155,6 @@ export function cacheSweep() {
       }
     }
   } catch {
-    /* ignore */
   }
   return { removed, kept };
 }

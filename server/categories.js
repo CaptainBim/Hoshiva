@@ -67,10 +67,8 @@ const STOP_TAGS = new Set([
  */
 const GENERIC_ATTR = new RegExp(
   ('\\b(' +
-  // rambut & wajah
   'hair|eye|eyes|eyebrow|eyebrows|skin|face|cheek|cheeks|lips|nose|ears|fringe|bangs|twintails|' +
   'ponytail|twisted|bun|braid|hairband|hairclip|headband|ahoge|' +
-  // pakaian & aksesori
   'dress|shirt|skirt|uniform|thighhighs|thighhigh|stockings|stocking|shoes|shoe|gloves|hat|' +
   'ribbon|bow|necktie|neckwear|boots|socks|jacket|coat|hoodie|shorts|pants|jeans|tie|bra|' +
   'swimsuit|bikini|underwear|panties|sleeves|sleeve|shoulders|collar|buttons|detached|' +
@@ -78,22 +76,16 @@ const GENERIC_ATTR = new RegExp(
   // jadi bentuk jamak harus ditulis eksplisit.
   'sleeveless|clothes|clothing|outfit|sweater|apron|scarf|belt|bag|bags|' +
   'glasses|eyewear|helmet|mask|crown|veil|cape|robe|sandals|' +
-  // ekspresi & framing
   'smile|smirk|grin|wink|blush|open_mouth|closed_mouth|expressionless|serious|looking_at_viewer|' +
   'looking_back|one_eye|two_eyes|bust|cropped|half_body|full_body|upper_body|lower_body|' +
-  // anatomi
   'bare|horn|horns|weapon|holding|hand|hands|arm|arms|leg|legs|foot|feet|finger|fingers|neck|back|' +
   'chest|cleavage|breast|breasts|thigh|thighs|calves|ankle|ankles|elbow|knees|topless|' +
   // anatomi turunan: "tooth" -> "teeth", plus keluarga skeleton
   'teeth|tooth|fang|fangs|tongue|tusk|mane|skull|skeleton|humanoid|' +
-  // postur & arah framing
   'standing|sitting|squatting|kneeling|leaning|crouching|posing|from_side|' +
-  // ukuran & bentuk
   'tall|large|small|big|huge|tiny|square|rectangle|circular|horizontal|' +
   'vertical|close_up|fullscreen|widescreen|' +
-  // warna & panjang generik
   'color|colour|long|short|medium|redhead|blonde|brunette|' +
-  // metadata media
   'media|book|copyright|commission|metadata|tagger|theme|mood|setting|scene' +
   ')\\b').replace(/_/g, ' '),
   'i'
@@ -216,8 +208,6 @@ export function isUsefulTag(tag) {
 
 const norm = (t) => String(t).toLowerCase().replace(/_/g, ' ').trim();
 
-/* ------------------------------ budgets ------------------------------ */
-
 /**
  * Empat rem yang menjaga kategori auto tetap ringan.
  *
@@ -243,21 +233,17 @@ const DAY = 86400000;
 const PROMO_MIN_ENTITY = 5;
 const PROMO_MIN_PLAIN = 22;
 
-/** Plafon jumlah kategori auto. */
 const MAX_AUTO_CATS = 400;
 
 /** Kategori auto dianggap basi setelah ini tidak tersentuh. */
 const STALE_AFTER = 30 * DAY;
 /** ...dan pun hanya diluruhkan kalau memang tidak pernah dipakai serius. */
 const STALE_MIN_HITS = 12;
-/** Batas jumlah yang boleh diluruhkan per sweep, satu gilir saja. */
 const STALE_BATCH = 120;
 
 /** Penundaan: cap dicek paling sering segitu, meluruh paling sering segitu. */
 const CAP_CHECK_MS = 5 * 60 * 1000;
 const STALE_CHECK_MS = 6 * 60 * 60 * 1000;
-
-/* ----------------------------- storage ----------------------------- */
 
 const state = {
   cats: {},        // id -> { id, label, emoji, auto, hits, lastSeen }
@@ -429,7 +415,6 @@ function load() {
     state.posts = raw.posts || {};
     state.totalIngested = raw.totalIngested || 0;
     state.lastIngestAt = raw.lastIngestAt || 0;
-    // pastikan seed category selalu ada, tanpa menimpa hits yang tersimpan
     seedCats();
     const dropped = pruneAutoCategories();
     if (dropped.length) {
@@ -460,8 +445,6 @@ function save() {
   }, 1200);
   saveTimer.unref?.();
 }
-
-/* --------------------------- classification --------------------------- */
 
 const PATTERN_INDEX = (() => {
   const idx = [];
@@ -534,7 +517,6 @@ function autoPromote(tag, count) {
   return id;
 }
 
-/** Jumlah kategori auto saat ini. */
 function autoCount() {
   let n = 0;
   for (const c of Object.values(state.cats)) if (c.auto) n++;
@@ -552,10 +534,8 @@ export function ingest(items = []) {
   for (const it of items) {
     state.totalIngested++;
 
-    // 1. cocokkan ke kategori pola
     const tags = (it.tags || []).filter((t) => !STOP_TAGS.has(norm(t)));
     const matched = matchPatterns(tags.length ? tags : [norm(it.title || '')]);
-    // 2. orientasi/rasio & kategori bawaan sumber juga memengaruhi kategori
     if (it.orientation === 'landscape') matched.add('landscape');
     // Wallhaven hanya memberi kategori kasar: anime / people / general
     if (it.category === 'anime') {
@@ -572,7 +552,6 @@ export function ingest(items = []) {
       }
     }
 
-    // 3. hitung frekuensi tag untuk auto-kategori & trending
     const seen = new Set();
     for (const raw of tags) {
       const t = norm(raw);
@@ -589,7 +568,6 @@ export function ingest(items = []) {
       }
     }
 
-    // 4. simpan post baru untuk feed "Baru masuk"
     const key = `${it.source}:${it.id}`;
     if (!state.posts[key]) {
       state.posts[key] = {
@@ -604,7 +582,6 @@ export function ingest(items = []) {
     }
   }
 
-  // Batasi ukuran store
   const postKeys = Object.keys(state.posts);
   if (postKeys.length > 3000) {
     postKeys
@@ -630,8 +607,6 @@ export function ingest(items = []) {
   };
 }
 
-/* ------------------------------- public ------------------------------- */
-
 export function listCategories({ includeAuto = true, minHits = 1, limit = 60 } = {}) {
   return Object.values(state.cats)
     .filter((c) => (includeAuto ? true : !c.auto))
@@ -655,7 +630,6 @@ export function topTags(limit = 40) {
     .map(([tag, v]) => ({ tag, count: v.count, lastSeen: v.lastSeen }));
 }
 
-/** Wallpaper yang pertama kaliSeen oleh Hoshiva -> feed "Baru Masuk". */
 export function freshPosts(limit = 24) {
   return Object.entries(state.posts)
     .sort((a, b) => b[1].at - a[1].at)
